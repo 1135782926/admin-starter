@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AdminRoleRequest;
 use App\Http\Resources\AdminRoleResource;
+use App\Http\Responses\ApiResponse;
 use App\Models\AdminMenu;
 use App\Models\AdminRole;
 use App\Models\AdminUser;
@@ -27,7 +28,7 @@ class RoleController extends Controller
                 ->map(fn (array $role): array => [...$role, 'children' => $build($role['id'])])->values()->all();
         };
 
-        return $this->success($build(null));
+        return ApiResponse::success($build(null));
     }
 
     public function options(Request $request): JsonResponse
@@ -36,7 +37,7 @@ class RoleController extends Controller
         abort_unless($access->allows($request->user(), 'system.admin.view') || $access->allows($request->user(), 'system.role.view'), 403, '无权查看角色组选项。');
         $assignable = $this->scope->assignableRoleIds($request->user());
 
-        return $this->success(array_values(array_map(fn (array $role): array => [
+        return ApiResponse::success(array_values(array_map(fn (array $role): array => [
             'id' => $role['id'], 'name' => $role['name'], 'display_name' => $role['display_name'],
             'parent_id' => $role['parent_id'], 'status' => $role['status'], 'effective_status' => $role['effective_status'],
             'can_assign' => in_array($role['id'], $assignable, true),
@@ -69,21 +70,21 @@ class RoleController extends Controller
         $records = $this->records($request);
         abort_unless(isset($records[$role->id]), 403, '角色组不在管理范围内。');
 
-        return $this->success($records[$role->id]);
+        return ApiResponse::success($records[$role->id]);
     }
 
     public function store(AdminRoleRequest $request): JsonResponse
     {
         $role = $this->roles->create($request->user(), $request->validated());
 
-        return $this->success($this->records($request)[$role->id], 201);
+        return ApiResponse::success($this->records($request)[$role->id], 201);
     }
 
     public function update(AdminRoleRequest $request, AdminRole $role): JsonResponse
     {
         $role = $this->roles->update($request->user(), $role, $request->validated());
 
-        return $this->success($this->records($request)[$role->id]);
+        return ApiResponse::success($this->records($request)[$role->id]);
     }
 
     public function destroy(Request $request, AdminRole $role): JsonResponse
@@ -91,7 +92,7 @@ class RoleController extends Controller
         $request->validate(['confirmed' => ['required', 'accepted']]);
         $this->roles->delete($request->user(), $role);
 
-        return $this->success(null);
+        return ApiResponse::success(null);
     }
 
     public function permissionTree(Request $request): JsonResponse
@@ -123,11 +124,6 @@ class RoleController extends Controller
             return $result;
         };
 
-        return $this->success($build(0));
-    }
-
-    private function success(mixed $data, int $status = 200): JsonResponse
-    {
-        return response()->json(['code' => 200, 'msg' => '操作成功', 'data' => $data], $status);
+        return ApiResponse::success($build(0));
     }
 }

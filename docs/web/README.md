@@ -8,7 +8,7 @@
 <br />
 <div align="center">
 
-[![license](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE) [![github stars](https://img.shields.io/github/stars/Daymychen/art-design-pro)](https://github.com/Daymychen/art-design-pro/stargazers) [![github forks](https://img.shields.io/github/forks/Daymychen/art-design-pro)](https://github.com/Daymychen/art-design-pro/network/members)
+[![license](https://img.shields.io/badge/license-MIT-green.svg)](../../web/LICENSE) [![github stars](https://img.shields.io/github/stars/Daymychen/art-design-pro)](https://github.com/Daymychen/art-design-pro/stargazers) [![github forks](https://img.shields.io/github/forks/Daymychen/art-design-pro)](https://github.com/Daymychen/art-design-pro/network/members)
 
 </div>
 <br />
@@ -45,7 +45,7 @@ Code Standards: Eslint, Prettier, Stylelint, Husky, Lint-staged, cz-git
 
 ## Quick Access
 
-[Live Demo](https://www.artd.pro) | [Official Documentation](https://www.artd.pro/docs) | [Changelog](./CHANGELOG.en.md)
+[Live Demo](https://www.artd.pro) | [Official Documentation](https://www.artd.pro/docs) | [Changelog](./CHANGELOG.md)
 
 ## Installation & Setup
 

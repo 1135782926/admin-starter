@@ -151,10 +151,6 @@ const stats = {
 
 // 清理目标
 const targets = [
-  'README.md',
-  'README.zh-CN.md',
-  'CHANGELOG.md',
-  'CHANGELOG.zh-CN.md',
   'src/views/change',
   'src/views/safeguard',
   'src/views/article',

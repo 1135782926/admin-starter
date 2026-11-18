@@ -3,6 +3,7 @@
 use App\Http\Middleware\AuthenticateAdmin;
 use App\Http\Middleware\RecordAdminLog;
 use App\Http\Middleware\RequireAdminPermission;
+use App\Http\Responses\ApiResponse;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -40,12 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
             $status = $response->getStatusCode();
             $message = $status === 429 ? '请求过于频繁，请稍后重试' : ($payload['message'] ?? Response::$statusTexts[$status] ?? '请求失败');
 
-            return response()->json([
-                'code' => $status,
-                'msg' => $message,
-                'message' => $message,
-                'data' => null,
-                ...isset($payload['errors']) ? ['errors' => $payload['errors']] : [],
-            ], $status)->withHeaders(collect($response->headers->all())->except(['content-type', 'content-length'])->all());
+            return ApiResponse::error($message, $status, $payload['errors'] ?? null)
+                ->withHeaders(collect($response->headers->all())->except(['content-type', 'content-length'])->all());
         });
     })->create();

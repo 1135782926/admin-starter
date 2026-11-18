@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Edit menu and button allocations together, limit selections to the parent allocation, and keep reserved roles read-only; shrinking allocations and disabling branches are explained before saving.
 - Add a read-only administrator audit log page with server-side filters and pagination, permission-gated details, verified actor snapshots separate from unverified login names, masked field diffs, and related authorization changes.
 - Use `ArtSearchBar` and `ArtTable` for administrator audit log filters, rows, and server-side pagination.
+- Use move/edit/delete icon buttons with tooltips and handle-based hierarchy dragging on menu rows.
+- Redesign role group create/edit dialogs with a single-column form, grouped third-level operation permission rows, status radios, and a bounded scrollable body.
+- Standardize menu create/edit dialogs with full-width single-column fields, radio options, bounded scrolling, and corrected form validation clearing.
 - Restart Vite after changing development API settings; rebuild production assets after environment changes. Production serves `/api` from the Laravel origin.
 
 ## [Released]
@@ -650,11 +653,11 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.
 
 ## Contributing
 
-If you want to contribute to the project, please check [CONTRIBUTING.md](./CONTRIBUTING.md).
+See [how to contribute](./README.md#contributing).
 
 ## License
 
-[MIT License](./LICENSE)
+[MIT License](../../web/LICENSE)
 
 ---
 

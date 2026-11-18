@@ -31,8 +31,8 @@ class AdminMenuResource extends JsonResource
             'keep_alive' => $this->keep_alive,
             'status' => $this->status,
             'remark' => $this->remark,
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at?->toDateTimeString(),
+            'updated_at' => $this->updated_at?->toDateTimeString(),
         ];
     }
 }

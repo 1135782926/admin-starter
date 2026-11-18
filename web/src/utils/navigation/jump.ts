@@ -59,7 +59,7 @@ export const handleMenuJump = (item: AppRouteRecord, jumpToFirst: boolean = fals
   }
 
   // 如果第一个子菜单是外部链接则打开新窗口
-  if (firstChild.meta?.link) {
+  if (firstChild.meta?.link && !firstChild.meta.isIframe) {
     return openExternalLink(firstChild.meta.link)
   }
 

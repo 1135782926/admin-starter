@@ -30,8 +30,8 @@ class AdminAccountResource extends JsonResource
             'status' => (bool) $this->status,
             'role_ids' => $roles->pluck('id')->all(),
             'roles' => $roles->all(),
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at?->toDateTimeString(),
+            'updated_at' => $this->updated_at?->toDateTimeString(),
             'can_manage' => true,
         ];
     }

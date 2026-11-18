@@ -34,7 +34,7 @@ class AdminLogResource extends JsonResource
             'ip_address' => $this->ip_address,
             'user_agent' => $this->user_agent,
             'duration_ms' => $this->duration_ms,
-            'created_at' => $this->created_at?->toISOString(),
+            'created_at' => $this->created_at?->toDateTimeString(),
             'changes' => $this->when($request->routeIs('admin.logs.show'), fn () => $this->changes),
             'related_changes' => $this->when($request->routeIs('admin.logs.show'), fn () => $this->related_changes),
         ];

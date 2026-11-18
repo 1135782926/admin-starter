@@ -3,7 +3,7 @@
     :title="dialogTitle"
     :model-value="visible"
     @update:model-value="handleCancel"
-    width="860px"
+    width="min(1100px, calc(100% - 32px))"
     align-center
     class="menu-dialog"
     @closed="handleClosed"
@@ -13,24 +13,17 @@
       v-model="form"
       :items="formItems"
       :rules="rules"
-      :span="width > 640 ? 12 : 24"
-      :gutter="20"
-      label-width="100px"
+      :span="24"
+      :gutter="16"
+      label-width="110px"
       :show-reset="false"
       :show-submit="false"
-    >
-      <template #menuType>
-        <ElRadioGroup v-model="form.menuType" :disabled="disableMenuType">
-          <ElRadioButton value="menu" label="menu">菜单</ElRadioButton>
-          <ElRadioButton value="button" label="button">按钮</ElRadioButton>
-        </ElRadioGroup>
-      </template>
-    </ArtForm>
+    />
 
     <template #footer>
       <span class="dialog-footer">
-        <ElButton @click="handleCancel">取 消</ElButton>
-        <ElButton type="primary" @click="handleSubmit">确 定</ElButton>
+        <ElButton :disabled="saving" @click="handleCancel">取 消</ElButton>
+        <ElButton type="primary" :loading="saving" @click="handleSubmit">保 存</ElButton>
       </span>
     </template>
   </ElDialog>
@@ -38,347 +31,425 @@
 
 <script setup lang="ts">
   import type { FormRules } from 'element-plus'
-  import { ElIcon, ElTooltip } from 'element-plus'
-  import { QuestionFilled } from '@element-plus/icons-vue'
-  import { formatMenuTitle } from '@/utils/router'
-  import type { AppRouteRecord } from '@/types/router'
-  import type { FormItem } from '@/components/core/forms/art-form/index.vue'
-  import ArtForm from '@/components/core/forms/art-form/index.vue'
-  import { useWindowSize } from '@vueuse/core'
+  import ArtForm, { type FormItem } from '@/components/core/forms/art-form/index.vue'
+  import {
+    buildParentOptions,
+    menuOpenTypeLabels,
+    menuTypeLabels,
+    type MenuNode,
+    type MenuOption,
+    type MenuType
+  } from './menu-tree'
 
-  const { width } = useWindowSize()
+  type MenuInput = Api.SystemManage.MenuInput
+  type MenuUpdateInput = Api.SystemManage.MenuUpdateInput
+  type MenuOpenType = Api.SystemManage.MenuOpenType
 
-  /**
-   * 创建带 tooltip 的表单标签
-   * @param label 标签文本
-   * @param tooltip 提示文本
-   * @returns 渲染函数
-   */
-  const createLabelTooltip = (label: string, tooltip: string) => {
-    return () =>
-      h('span', { class: 'flex items-center' }, [
-        h('span', label),
-        h(
-          ElTooltip,
-          {
-            content: tooltip,
-            placement: 'top'
-          },
-          () => h(ElIcon, { class: 'ml-0.5 cursor-help' }, () => h(QuestionFilled))
-        )
-      ])
-  }
-
-  interface MenuFormData {
-    id: number
+  interface FormState {
+    type: MenuType
+    parent_id: number | null
+    title: string
     name: string
+    open_type: MenuOpenType
     path: string
-    label: string
     component: string
+    url: string
     icon: string
-    isEnable: boolean
     sort: number
-    isMenu: boolean
-    keepAlive: boolean
-    isHide: boolean
-    isHideTab: boolean
-    link: string
-    isIframe: boolean
-    showBadge: boolean
-    showTextBadge: string
-    fixedTab: boolean
-    activePath: string
-    roles: string[]
-    isFullPage: boolean
-    authName: string
-    authLabel: string
-    authIcon: string
-    authSort: number
+    keep_alive: boolean
+    status: boolean
+    remark: string
+    buttons: string[]
   }
 
   interface Props {
     visible: boolean
-    editData?: AppRouteRecord | any
-    type?: 'menu' | 'button'
-    lockType?: boolean
+    mode: 'create' | 'edit'
+    node: MenuNode | null
+    parent: MenuNode | null
+    allowedTypes: MenuType[]
+    nodes: MenuNode[]
+    saving?: boolean
   }
 
   interface Emits {
     (e: 'update:visible', value: boolean): void
-    (e: 'submit', data: MenuFormData): void
+    (e: 'submit', data: MenuInput | MenuUpdateInput): void
   }
 
   const props = withDefaults(defineProps<Props>(), {
-    visible: false,
-    type: 'menu',
-    lockType: false
+    node: null,
+    parent: null,
+    saving: false
   })
 
   const emit = defineEmits<Emits>()
-
   const formRef = ref()
-  const isEdit = ref(false)
 
-  const form = reactive<MenuFormData & { menuType: 'menu' | 'button' }>({
-    menuType: 'menu',
-    id: 0,
+  const createForm = (): FormState => ({
+    type: 'directory',
+    parent_id: null,
+    title: '',
     name: '',
+    open_type: 'page',
     path: '',
-    label: '',
     component: '',
+    url: '',
     icon: '',
-    isEnable: true,
     sort: 1,
-    isMenu: true,
-    keepAlive: true,
-    isHide: false,
-    isHideTab: false,
-    link: '',
-    isIframe: false,
-    showBadge: false,
-    showTextBadge: '',
-    fixedTab: false,
-    activePath: '',
-    roles: [],
-    isFullPage: false,
-    authName: '',
-    authLabel: '',
-    authIcon: '',
-    authSort: 1
+    keep_alive: false,
+    status: true,
+    remark: '',
+    buttons: ['view', 'create', 'update', 'delete']
   })
 
-  const rules = reactive<FormRules>({
-    name: [
-      { required: true, message: '请输入菜单名称', trigger: 'blur' },
-      { min: 2, max: 20, message: '长度在 2 到 20 个字符', trigger: 'blur' }
-    ],
-    path: [{ required: true, message: '请输入路由地址', trigger: 'blur' }],
-    label: [{ required: true, message: '输入权限标识', trigger: 'blur' }],
-    authName: [{ required: true, message: '请输入权限名称', trigger: 'blur' }],
-    authLabel: [{ required: true, message: '请输入权限标识', trigger: 'blur' }]
-  })
-
-  /**
-   * 表单项配置
-   */
-  const formItems = computed<FormItem[]>(() => {
-    const baseItems: FormItem[] = [{ label: '菜单类型', key: 'menuType', span: 24 }]
-
-    // Switch 组件的 span：小屏幕 12，大屏幕 6
-    const switchSpan = width.value < 640 ? 12 : 6
-
-    if (form.menuType === 'menu') {
-      return [
-        ...baseItems,
-        { label: '菜单名称', key: 'name', type: 'input', props: { placeholder: '菜单名称' } },
-        {
-          label: createLabelTooltip(
-            '路由地址',
-            '一级菜单：以 / 开头的绝对路径（如 /dashboard）\n二级及以下：相对路径（如 console、user）'
-          ),
-          key: 'path',
-          type: 'input',
-          props: { placeholder: '如：/dashboard 或 console' }
-        },
-        { label: '权限标识', key: 'label', type: 'input', props: { placeholder: '如：User' } },
-        {
-          label: createLabelTooltip(
-            '组件路径',
-            '一级父级菜单：填写 /index/index\n具体页面：填写组件路径（如 /system/user）\n目录菜单：留空'
-          ),
-          key: 'component',
-          type: 'input',
-          props: { placeholder: '如：/system/user 或留空' }
-        },
-        { label: '图标', key: 'icon', type: 'input', props: { placeholder: '如：ri:user-line' } },
-        {
-          label: createLabelTooltip(
-            '角色权限',
-            '仅用于前端权限模式：配置角色标识（如 R_SUPER、R_ADMIN）\n后端权限模式：无需配置'
-          ),
-          key: 'roles',
-          type: 'inputtag',
-          props: { placeholder: '输入角色标识后按回车，如：R_SUPER' }
-        },
-        {
-          label: '菜单排序',
-          key: 'sort',
-          type: 'number',
-          props: { min: 1, controlsPosition: 'right', style: { width: '100%' } }
-        },
-        {
-          label: '外部链接',
-          key: 'link',
-          type: 'input',
-          props: { placeholder: '如：https://www.example.com' }
-        },
-        {
-          label: '文本徽章',
-          key: 'showTextBadge',
-          type: 'input',
-          props: { placeholder: '如：New、Hot' }
-        },
-        {
-          label: createLabelTooltip(
-            '激活路径',
-            '用于详情页等隐藏菜单，指定高亮显示的父级菜单路径\n例如：用户详情页高亮显示"用户管理"菜单'
-          ),
-          key: 'activePath',
-          type: 'input',
-          props: { placeholder: '如：/system/user' }
-        },
-        { label: '是否启用', key: 'isEnable', type: 'switch', span: switchSpan },
-        { label: '页面缓存', key: 'keepAlive', type: 'switch', span: switchSpan },
-        { label: '隐藏菜单', key: 'isHide', type: 'switch', span: switchSpan },
-        { label: '是否内嵌', key: 'isIframe', type: 'switch', span: switchSpan },
-        { label: '显示徽章', key: 'showBadge', type: 'switch', span: switchSpan },
-        { label: '固定标签', key: 'fixedTab', type: 'switch', span: switchSpan },
-        { label: '标签隐藏', key: 'isHideTab', type: 'switch', span: switchSpan },
-        { label: '全屏页面', key: 'isFullPage', type: 'switch', span: switchSpan }
-      ]
-    } else {
-      return [
-        ...baseItems,
-        {
-          label: '权限名称',
-          key: 'authName',
-          type: 'input',
-          props: { placeholder: '如：新增、编辑、删除' }
-        },
-        {
-          label: '权限标识',
-          key: 'authLabel',
-          type: 'input',
-          props: { placeholder: '如：add、edit、delete' }
-        },
-        {
-          label: '权限排序',
-          key: 'authSort',
-          type: 'number',
-          props: { min: 1, controlsPosition: 'right', style: { width: '100%' } }
-        }
-      ]
-    }
-  })
+  const form = reactive<FormState>(createForm())
 
   const dialogTitle = computed(() => {
-    const type = form.menuType === 'menu' ? '菜单' : '按钮'
-    return isEdit.value ? `编辑${type}` : `新建${type}`
+    const action = props.mode === 'edit' ? '编辑' : '新建'
+    return `${action}${menuTypeLabels[form.type]}`
   })
 
-  /**
-   * 是否禁用菜单类型切换
-   */
-  const disableMenuType = computed(() => {
-    if (isEdit.value) return true
-    if (!isEdit.value && form.menuType === 'menu' && props.lockType) return true
-    return false
-  })
+  const typeOptions = computed(() =>
+    props.allowedTypes.map((value) => ({ value, label: menuTypeLabels[value], border: true }))
+  )
 
-  /**
-   * 重置表单数据
-   */
-  const resetForm = (): void => {
-    formRef.value?.reset()
-    form.menuType = 'menu'
+  const openTypeOptions = Object.entries(menuOpenTypeLabels).map(([value, label]) => ({
+    value,
+    label,
+    border: true
+  }))
+
+  const buttonOptions = [
+    { value: 'view', label: '查看' },
+    { value: 'create', label: '添加' },
+    { value: 'update', label: '编辑' },
+    { value: 'delete', label: '删除' }
+  ]
+
+  const statusOptions = [
+    { value: false, label: '禁用', border: true },
+    { value: true, label: '启用', border: true }
+  ]
+
+  const parentOptions = computed<MenuOption[]>(() =>
+    buildParentOptions(props.nodes, props.mode === 'edit' ? props.node : null, form.type)
+  )
+
+  const treeSelectProps = {
+    props: {
+      label: 'title',
+      children: 'children',
+      value: 'id',
+      disabled: 'disabled',
+      emitPath: false,
+      checkStrictly: true
+    },
+    clearable: true,
+    placeholder: '根节点',
+    class: '!w-full'
   }
 
-  /**
-   * 加载表单数据（编辑模式）
-   */
-  const loadFormData = (): void => {
-    if (!props.editData) return
-
-    isEdit.value = true
-
-    if (form.menuType === 'menu') {
-      const row = props.editData
-      form.id = row.id || 0
-      form.name = formatMenuTitle(row.meta?.title || '')
-      form.path = row.path || ''
-      form.label = row.name || ''
-      form.component = row.component || ''
-      form.icon = row.meta?.icon || ''
-      form.sort = row.meta?.sort || 1
-      form.isMenu = row.meta?.isMenu ?? true
-      form.keepAlive = row.meta?.keepAlive ?? false
-      form.isHide = row.meta?.isHide ?? false
-      form.isHideTab = row.meta?.isHideTab ?? false
-      form.isEnable = row.meta?.isEnable ?? true
-      form.link = row.meta?.link || ''
-      form.isIframe = row.meta?.isIframe ?? false
-      form.showBadge = row.meta?.showBadge ?? false
-      form.showTextBadge = row.meta?.showTextBadge || ''
-      form.fixedTab = row.meta?.fixedTab ?? false
-      form.activePath = row.meta?.activePath || ''
-      form.roles = row.meta?.roles || []
-      form.isFullPage = row.meta?.isFullPage ?? false
-    } else {
-      const row = props.editData
-      form.authName = row.title || ''
-      form.authLabel = row.authMark || ''
-      form.authIcon = row.icon || ''
-      form.authSort = row.sort || 1
-    }
-  }
-
-  /**
-   * 提交表单
-   */
-  const handleSubmit = async (): Promise<void> => {
-    if (!formRef.value) return
-
-    try {
-      await formRef.value.validate()
-      emit('submit', { ...form })
-      ElMessage.success(`${isEdit.value ? '编辑' : '新增'}成功`)
-      handleCancel()
-    } catch {
-      ElMessage.error('表单校验失败，请检查输入')
-    }
-  }
-
-  /**
-   * 取消操作
-   */
-  const handleCancel = (): void => {
-    emit('update:visible', false)
-  }
-
-  /**
-   * 对话框关闭后的回调
-   */
-  const handleClosed = (): void => {
-    resetForm()
-    isEdit.value = false
-  }
-
-  /**
-   * 监听对话框显示状态
-   */
-  watch(
-    () => props.visible,
-    (newVal) => {
-      if (newVal) {
-        form.menuType = props.type
-        nextTick(() => {
-          if (props.editData) {
-            loadFormData()
+  const rules = computed<FormRules>(() => ({
+    type: [{ required: true, message: '请选择节点类型', trigger: 'change' }],
+    title: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+    name: [
+      { required: true, message: '请输入节点标识', trigger: 'blur' },
+      {
+        validator: (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+          if (!/^[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*$/.test(value || '')) {
+            callback(new Error('仅允许字母、数字、下划线、短横线及点分隔的层级'))
+            return
           }
+          if (form.type === 'button') {
+            const prefix = props.parent?.name
+            if (!prefix || !value.startsWith(`${prefix}.`) || value === `${prefix}.access`) {
+              callback(new Error('按钮标识必须位于所属菜单权限前缀下，且不能使用 access'))
+              return
+            }
+          }
+          callback()
+        },
+        trigger: 'blur'
+      }
+    ],
+    open_type: [{ required: true, message: '请选择打开方式', trigger: 'change' }],
+    path: [
+      { required: true, message: '请输入路由地址', trigger: 'blur' },
+      {
+        validator: (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+          if (value && !/^\/(?!\/)[^?#\s]*$/.test(value)) {
+            callback(new Error('路由地址必须以 / 开头且不能包含空格、? 或 #'))
+            return
+          }
+          callback()
+        },
+        trigger: 'blur'
+      }
+    ],
+    component: [{ required: true, message: '请输入组件路径', trigger: 'blur' }],
+    url: [
+      { required: true, message: '请输入链接地址', trigger: 'blur' },
+      {
+        validator: (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+          if (!value) {
+            callback()
+            return
+          }
+          try {
+            const parsed = new URL(value)
+            if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('invalid')
+            callback()
+          } catch {
+            callback(new Error('链接必须是有效的 http 或 https 地址'))
+          }
+        },
+        trigger: 'blur'
+      }
+    ],
+    parent_id: [
+      {
+        validator: (_rule: unknown, value: number | null, callback: (error?: Error) => void) => {
+          if (form.type === 'button' && value === null) {
+            callback(new Error('按钮必须选择所属菜单'))
+            return
+          }
+          callback()
+        },
+        trigger: 'change'
+      }
+    ]
+  }))
+
+  const formItems = computed<FormItem[]>(() => {
+    const items: FormItem[] = [
+      {
+        label: '节点类型',
+        key: 'type',
+        type: 'radiogroup',
+        props: {
+          options: typeOptions.value,
+          disabled: props.mode === 'edit' || typeOptions.value.length === 1
+        }
+      },
+      {
+        label: '上级节点',
+        key: 'parent_id',
+        type: 'treeselect',
+        props: {
+          ...treeSelectProps,
+          data: parentOptions.value,
+          disabled: props.mode === 'edit' && form.type === 'button'
+        }
+      },
+      { label: '名称', key: 'title', type: 'input', props: { maxlength: 255 } },
+      {
+        label: '节点标识',
+        key: 'name',
+        type: 'input',
+        props: { maxlength: 248, disabled: props.mode === 'edit' }
+      }
+    ]
+
+    if (form.type !== 'button') {
+      items.push({ label: '路由地址', key: 'path', type: 'input', props: { maxlength: 255 } })
+    }
+
+    if (form.type === 'menu') {
+      items.push({
+        label: '打开方式',
+        key: 'open_type',
+        type: 'radiogroup',
+        props: { options: openTypeOptions, disabled: props.mode === 'edit' }
+      })
+      if (form.open_type === 'page') {
+        items.push({
+          label: '组件路径',
+          key: 'component',
+          type: 'input',
+          props: { maxlength: 255 }
+        })
+        items.push({
+          label: '页面缓存',
+          key: 'keep_alive',
+          type: 'radiogroup',
+          props: { options: statusOptions }
+        })
+      } else {
+        items.push({ label: '链接地址', key: 'url', type: 'input', props: { maxlength: 2048 } })
+      }
+      if (props.mode === 'create' && form.open_type === 'page') {
+        items.push({
+          label: '基础按钮',
+          key: 'buttons',
+          type: 'checkboxgroup',
+          span: 24,
+          props: { options: buttonOptions }
         })
       }
     }
-  )
 
-  /**
-   * 监听菜单类型变化
-   */
-  watch(
-    () => props.type,
-    (newType) => {
-      if (props.visible) {
-        form.menuType = newType
+    if (form.type !== 'button') {
+      items.push({ label: '图标', key: 'icon', type: 'input', props: { maxlength: 255 } })
+    }
+
+    items.push(
+      {
+        label: '排序',
+        key: 'sort',
+        type: 'number',
+        props: { min: -2147483648, max: 2147483647, class: '!w-full' }
+      },
+      { label: '状态', key: 'status', type: 'radiogroup', props: { options: statusOptions } },
+      {
+        label: '备注',
+        key: 'remark',
+        type: 'input',
+        span: 24,
+        props: { type: 'textarea', rows: 3, maxlength: 10000 }
       }
+    )
+
+    return items
+  })
+
+  function loadForm(): void {
+    const next = createForm()
+    if (props.mode === 'edit' && props.node) {
+      const node = props.node
+      Object.assign(next, {
+        type: node.type,
+        parent_id: node.parent_id,
+        title: node.title,
+        name: node.name,
+        open_type: node.open_type ?? 'page',
+        path: node.path ?? '',
+        component: node.component ?? '',
+        url: node.url ?? '',
+        icon: node.icon ?? '',
+        sort: node.sort,
+        keep_alive: node.keep_alive,
+        status: node.status,
+        remark: node.remark ?? '',
+        buttons: []
+      })
+    } else {
+      next.type = props.allowedTypes[0] ?? 'directory'
+      next.parent_id = props.parent?.id ?? null
+      if (props.parent) next.sort = (props.parent.children?.length ?? 0) + 1
+    }
+    Object.assign(form, next)
+    void nextTick(() => formRef.value?.ref?.clearValidate())
+  }
+
+  function buildCreatePayload(): MenuInput {
+    const base: MenuInput = {
+      parent_id: form.parent_id,
+      type: form.type,
+      title: form.title.trim(),
+      name: form.name.trim(),
+      sort: form.sort,
+      status: form.status,
+      remark: form.remark.trim() || null
+    }
+
+    if (form.type === 'directory') {
+      return { ...base, path: form.path.trim(), icon: form.icon.trim() || null }
+    }
+    if (form.type === 'button') return base
+    if (form.open_type === 'page') {
+      return {
+        ...base,
+        open_type: 'page',
+        path: form.path.trim(),
+        component: form.component.trim(),
+        icon: form.icon.trim() || null,
+        keep_alive: form.keep_alive,
+        buttons: [...form.buttons]
+      }
+    }
+    return {
+      ...base,
+      open_type: form.open_type,
+      path: form.path.trim(),
+      url: form.url.trim(),
+      icon: form.icon.trim() || null
+    }
+  }
+
+  function buildUpdatePayload(): MenuUpdateInput {
+    const base: MenuUpdateInput = {
+      title: form.title.trim(),
+      sort: form.sort,
+      status: form.status,
+      remark: form.remark.trim() || null
+    }
+
+    if (form.type !== 'button') base.parent_id = form.parent_id
+    if (form.type === 'directory') {
+      return { ...base, path: form.path.trim(), icon: form.icon.trim() || null }
+    }
+    if (form.type === 'button') return base
+    if (form.open_type === 'page') {
+      return {
+        ...base,
+        open_type: 'page',
+        path: form.path.trim(),
+        component: form.component.trim(),
+        icon: form.icon.trim() || null,
+        keep_alive: form.keep_alive
+      }
+    }
+    return {
+      ...base,
+      open_type: form.open_type,
+      path: form.path.trim(),
+      url: form.url.trim(),
+      icon: form.icon.trim() || null
+    }
+  }
+
+  async function handleSubmit(): Promise<void> {
+    if (props.saving || !formRef.value) return
+    try {
+      await formRef.value.validate()
+    } catch {
+      return
+    }
+
+    emit('submit', props.mode === 'edit' ? buildUpdatePayload() : buildCreatePayload())
+  }
+
+  function handleCancel(): void {
+    emit('update:visible', false)
+  }
+
+  function handleClosed(): void {
+    Object.assign(form, createForm())
+  }
+
+  watch(
+    () => props.visible,
+    (visible) => {
+      if (visible) loadForm()
     }
   )
 </script>
+
+<style>
+  .menu-dialog {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 40px);
+  }
+
+  .menu-dialog .el-dialog__header,
+  .menu-dialog .el-dialog__footer {
+    flex-shrink: 0;
+  }
+
+  .menu-dialog .el-dialog__body {
+    min-height: 0;
+    overflow-y: auto;
+  }
+</style>

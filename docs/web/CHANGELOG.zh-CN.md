@@ -639,11 +639,11 @@
 
 ## 贡献指南
 
-如果你想为项目做出贡献，请查看 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+参见 [贡献方式](./README.zh-CN.md#贡献)。
 
 ## 许可证
 
-[MIT License](./LICENSE)
+[MIT License](../../web/LICENSE)
 
 ---
 
@@ -651,4 +651,4 @@
 
 ---
 
-[English Version](./CHANGELOG.en.md)
+[English Version](./CHANGELOG.md)

@@ -1,9 +1,11 @@
 <?php
 
+use App\Models\AdminMenu;
 use App\Models\AdminPermission;
 use App\Models\AdminRole;
 use App\Models\AdminUser;
 use App\Models\User;
+use Database\Seeders\AdminUserSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -59,4 +61,25 @@ test('keeps administrator role permissions separate from users with the same ID'
     expect($admin->getRoleNames()->all())->toBe(['administrator']);
     expect($admin->can('admin-users.manage'))->toBeTrue();
     expect($user->can('admin-users.manage'))->toBeFalse();
+});
+
+test('default database seeding provides admin login and preserves a changed password on repeat', function (): void {
+    $this->seed();
+    $admin = AdminUser::query()->where('username', 'admin')->firstOrFail();
+
+    expect(AdminMenu::query()->where('name', 'system.menu')->exists())->toBeTrue();
+    expect($admin->status)->toBeTrue()
+        ->and($admin->hasRole('super-admin'))->toBeTrue()
+        ->and(Hash::check('admin', $admin->password))->toBeTrue();
+
+    $this->postJson('/api/v1/admin/auth/login', ['userName' => 'admin', 'password' => 'admin'])
+        ->assertOk()
+        ->assertJsonPath('code', 200)
+        ->assertJsonStructure(['data' => ['token']]);
+
+    $admin->update(['password' => 'changed-admin-password']);
+    $this->seed(AdminUserSeeder::class);
+
+    expect(AdminUser::query()->where('username', 'admin')->count())->toBe(1)
+        ->and(Hash::check('changed-admin-password', $admin->fresh()->password))->toBeTrue();
 });

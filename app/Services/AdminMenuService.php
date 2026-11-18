@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\AdminMenu;
 use App\Models\AdminPermission;
-use App\Models\AdminUser;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -112,11 +111,15 @@ class AdminMenuService
     {
         $children = $menu->children()->count();
         $permissionId = $menu->permission_id;
+        $directUserGrants = $permissionId ? DB::table(config('permission.table_names.model_has_permissions'))
+            ->select('model_type', 'model_id')
+            ->where('permission_id', $permissionId)
+            ->distinct() : null;
 
         return [
             'children_count' => $children,
             'roles_count' => $permissionId ? DB::table(config('permission.table_names.role_has_permissions'))->where('permission_id', $permissionId)->count() : 0,
-            'direct_users_count' => $permissionId ? DB::table(config('permission.table_names.model_has_permissions'))->where('permission_id', $permissionId)->where('model_type', (new AdminUser)->getMorphClass())->distinct()->count('model_id') : 0,
+            'direct_users_count' => $directUserGrants ? DB::query()->fromSub($directUserGrants, 'direct_users')->count() : 0,
             'can_delete' => $children === 0,
         ];
     }

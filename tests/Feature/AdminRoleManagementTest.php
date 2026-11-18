@@ -49,6 +49,7 @@ function roleManagementFlatten(array $nodes): array
 }
 
 test('creates reads updates and deletes a real hierarchical role with persisted permissions', function (): void {
+    $this->travelTo('2026-11-18 02:41:19');
     $this->seed([AdminMenuSeeder::class, AdminManagementMenuSeeder::class]);
     $admin = roleManagementSuperAdmin();
     $parent = roleManagementRole('operations', null, roleManagementPermissionIds(['system.menu.access', 'system.menu.view']));
@@ -59,6 +60,8 @@ test('creates reads updates and deletes a real hierarchical role with persisted 
         'name' => 'operations.readers', 'display_name' => 'Readers', 'parent_id' => $parent->id,
         'status' => true, 'remark' => 'Read operations', 'permission_ids' => $ids,
     ])->assertCreated()->assertJsonPath('code', 200)->assertJsonPath('data.display_name', 'Readers')
+        ->assertJsonPath('data.created_at', '2026-11-18 02:41:19')
+        ->assertJsonPath('data.updated_at', '2026-11-18 02:41:19')
         ->assertJsonPath('data.parent_id', $parent->id)->assertJsonPath('data.can_manage', true);
     $role = AdminRole::findOrFail($created->json('data.id'));
     expect($role->permissions()->pluck('id')->all())->toEqualCanonicalizing($ids);

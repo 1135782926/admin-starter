@@ -8,7 +8,7 @@
 <br />
 <div align="center">
 
-[![license](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE) [![github stars](https://img.shields.io/github/stars/Daymychen/art-design-pro)](https://github.com/Daymychen/art-design-pro/stargazers) [![github forks](https://img.shields.io/github/forks/Daymychen/art-design-pro)](https://github.com/Daymychen/art-design-pro/network/members)
+[![license](https://img.shields.io/badge/license-MIT-green.svg)](../../web/LICENSE) [![github stars](https://img.shields.io/github/stars/Daymychen/art-design-pro)](https://github.com/Daymychen/art-design-pro/stargazers) [![github forks](https://img.shields.io/github/forks/Daymychen/art-design-pro)](https://github.com/Daymychen/art-design-pro/network/members)
 
 </div>
 <br />
@@ -45,7 +45,7 @@
 
 ## 快速访问
 
-[演示地址](https://www.artd.pro) | [官方文档](https://www.artd.pro/docs) | [更新日志](./CHANGELOG.md)
+[演示地址](https://www.artd.pro) | [官方文档](https://www.artd.pro/docs) | [更新日志](./CHANGELOG.zh-CN.md)
 
 ## 安装运行
 

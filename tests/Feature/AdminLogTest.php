@@ -515,6 +515,7 @@ test('returns only own and currently manageable descendant actors before paginat
 });
 
 test('shows super administrators all actors including deleted actor snapshots and null actors without recursively logging reads', function (): void {
+    $this->travelTo('2026-11-18 02:41:19');
     $this->seed([AdminMenuSeeder::class, AdminManagementMenuSeeder::class]);
     $super = auditLogSuperAdmin();
     $deleted = AdminUser::factory()->create(['username' => 'audit-deleted-actor', 'nickname' => 'Deleted actor snapshot']);
@@ -528,6 +529,7 @@ test('shows super administrators all actors including deleted actor snapshots an
     $this->getJson('/api/v1/admin/logs/'.$log->id)->assertOk()
         ->assertJsonPath('data.actor_id', null)->assertJsonPath('data.actor_username', 'audit-deleted-actor')
         ->assertJsonPath('data.actor_nickname', 'Deleted actor snapshot')
+        ->assertJsonPath('data.created_at', '2026-11-18 02:41:19')
         ->assertJsonPath('data.changes.nickname', ['before' => 'Before', 'after' => 'After'])
         ->assertJsonMissingPaths(['data.actor', 'data.password', 'data.token', 'data.updated_at']);
     $this->getJson('/api/v1/admin/logs/'.$anonymous->id)->assertOk()->assertJsonPath('data.attempted_username', 'unknown-login');

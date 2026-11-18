@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AdminLoginRequest;
 use App\Http\Resources\AdminUserResource;
+use App\Http\Responses\ApiResponse;
 use App\Models\AdminUser;
 use App\Services\AdminLogRecorder;
 use Illuminate\Http\JsonResponse;
@@ -35,19 +36,19 @@ class AuthController extends Controller
             return $token->plainTextToken;
         });
 
-        return response()->json(['code' => 200, 'msg' => '操作成功', 'data' => ['token' => $token]])
+        return ApiResponse::success(['token' => $token])
             ->header('Cache-Control', 'no-store');
     }
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json(['code' => 200, 'msg' => '操作成功', 'data' => new AdminUserResource($request->user())]);
+        return ApiResponse::success(new AdminUserResource($request->user()));
     }
 
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json(['code' => 200, 'msg' => '操作成功', 'data' => null]);
+        return ApiResponse::success();
     }
 }

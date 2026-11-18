@@ -2,7 +2,8 @@
   <ElDialog
     v-model="visible"
     :title="roleData ? (readOnly ? '查看角色组（只读）' : '编辑角色组') : '新增角色组'"
-    width="min(960px, calc(100% - 32px))"
+    width="min(1200px, calc(100% - 32px))"
+    class="role-dialog"
     align-center
     destroy-on-close
     :close-on-click-modal="false"
@@ -21,46 +22,113 @@
         ref="formRef"
         :model="form"
         :rules="rules"
-        label-width="100px"
+        label-width="90px"
         :disabled="readOnly || loading || saving || !ready"
       >
-        <div class="grid grid-cols-1 gap-x-6 md:grid-cols-2">
-          <ElFormItem label="上级角色组" prop="parent_id">
-            <ElSelect
-              v-model="form.parent_id"
-              filterable
-              class="w-full"
-              placeholder="请选择上级角色组"
-              @change="changeParent"
-            >
-              <ElOption
-                v-if="isSuper || (readOnly && roleData?.parent_id === null)"
-                label="顶级角色组"
-                :value="0"
-              />
-              <ElOption
-                v-for="role in parentOptions"
-                :key="role.id"
-                :label="`${role.display_name} (${role.name})`"
-                :value="role.id"
-              />
-            </ElSelect>
-          </ElFormItem>
-          <ElFormItem label="角色编码" prop="name">
-            <ElInput
-              v-model="form.name"
-              :disabled="!!roleData"
-              maxlength="255"
-              placeholder="创建后不可修改"
+        <ElFormItem label="上级分组" prop="parent_id">
+          <ElSelect
+            v-model="form.parent_id"
+            filterable
+            class="w-full"
+            placeholder="点击选择"
+            @change="changeParent"
+          >
+            <ElOption
+              v-if="isSuper || (readOnly && roleData?.parent_id === null)"
+              label="顶级角色组"
+              :value="0"
             />
-          </ElFormItem>
-          <ElFormItem label="角色组名称" prop="display_name">
-            <ElInput v-model="form.display_name" maxlength="255" />
-          </ElFormItem>
-          <ElFormItem label="启用">
-            <ElSwitch v-model="form.status" />
-          </ElFormItem>
-        </div>
+            <ElOption
+              v-for="role in parentOptions"
+              :key="role.id"
+              :label="`${role.display_name} (${role.name})`"
+              :value="role.id"
+            />
+          </ElSelect>
+        </ElFormItem>
+        <ElFormItem label="角色编码" prop="name">
+          <ElInput
+            v-model="form.name"
+            :disabled="!!roleData"
+            maxlength="255"
+            placeholder="请输入角色编码，创建后不可修改"
+          />
+        </ElFormItem>
+        <ElFormItem label="组别名称" prop="display_name">
+          <ElInput v-model="form.display_name" maxlength="255" placeholder="请输入组别名称" />
+        </ElFormItem>
+        <ElFormItem label="权限">
+          <div class="w-full">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span class="text-sm text-g-600">已选 {{ selectedIds.length }} 项</span>
+              <ElSpace wrap>
+                <ElButton size="small" :disabled="loading || !ready" @click="toggleExpand">
+                  {{ expanded ? '全部收起' : '全部展开' }}
+                </ElButton>
+                <ElButton
+                  v-if="!readOnly"
+                  size="small"
+                  :disabled="loading || saving || !ready"
+                  @click="selectAll"
+                >
+                  全选可分配权限
+                </ElButton>
+                <ElButton
+                  v-if="!readOnly"
+                  size="small"
+                  :disabled="loading || saving || !ready"
+                  @click="setSelection([])"
+                >
+                  清空
+                </ElButton>
+              </ElSpace>
+            </div>
+            <p class="mb-2 text-xs text-g-500">
+              子组只能选择上级已分配的权限；缩减上级权限会同步移除所有下级的相应权限。
+            </p>
+            <ElScrollbar max-height="420px" class="w-full pr-2">
+              <ElTree
+                :key="String(expanded)"
+                ref="treeRef"
+                :data="treeRows"
+                node-key="key"
+                show-checkbox
+                check-strictly
+                :default-expand-all="expanded"
+                :default-checked-keys="checkedKeys"
+                :expand-on-click-node="false"
+                :props="{
+                  label: 'title',
+                  children: 'children',
+                  disabled: 'disabled',
+                  class: treeNodeClass
+                }"
+                class="[&_.el-tree-node__content]:!h-auto [&_.el-tree-node__content]:min-h-10 [&_.el-tree-node__content]:py-1"
+                @check="checkAccess"
+              >
+                <template #default="{ data }">
+                  <span>
+                    {{ data.title }}
+                    <span v-if="!data.effective_status" class="text-xs text-g-500">
+                      （已停用）
+                    </span>
+                  </span>
+                </template>
+              </ElTree>
+              <ElEmpty
+                v-if="ready && !treeRows.length"
+                description="暂无可分配的菜单权限"
+                :image-size="64"
+              />
+            </ElScrollbar>
+          </div>
+        </ElFormItem>
+        <ElFormItem label="状态">
+          <ElRadioGroup v-model="form.status">
+            <ElRadio :value="false" border>禁用</ElRadio>
+            <ElRadio :value="true" border>启用</ElRadio>
+          </ElRadioGroup>
+        </ElFormItem>
         <ElFormItem label="备注">
           <ElInput
             v-model="form.remark"
@@ -68,79 +136,10 @@
             :rows="2"
             maxlength="2000"
             show-word-limit
+            placeholder="请输入备注"
           />
         </ElFormItem>
       </ElForm>
-      <ElAlert
-        title="子组只能选择上级已分配的权限；缩减上级权限会同时移除所有下级的相应权限。禁用角色组后，该组及其下级权限均停止生效。"
-        type="info"
-        :closable="false"
-        class="mb-4"
-      />
-      <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <span class="font-medium">菜单与按钮权限（已选 {{ selectedIds.length }} 项）</span>
-        <ElSpace wrap>
-          <ElButton size="small" :disabled="loading || !ready" @click="toggleExpand">{{
-            expanded ? '全部收起' : '全部展开'
-          }}</ElButton>
-          <ElButton
-            v-if="!readOnly"
-            size="small"
-            :disabled="loading || saving || !ready"
-            @click="selectAll"
-            >全选可分配权限</ElButton
-          >
-          <ElButton
-            v-if="!readOnly"
-            size="small"
-            :disabled="loading || saving || !ready"
-            @click="setSelection([])"
-            >清空</ElButton
-          >
-        </ElSpace>
-      </div>
-      <ElScrollbar max-height="360px" class="rounded border border-g-300 p-3">
-        <ElTree
-          :key="String(expanded)"
-          ref="treeRef"
-          :data="treeRows"
-          node-key="key"
-          show-checkbox
-          check-strictly
-          :default-expand-all="expanded"
-          :default-checked-keys="checkedKeys"
-          :expand-on-click-node="false"
-          :props="{ label: 'title', children: 'children', disabled: 'disabled' }"
-          class="[&_.el-tree-node__content]:!h-auto [&_.el-tree-node__content]:min-h-10 [&_.el-tree-node__content]:py-1"
-          @check="checkAccess"
-        >
-          <template #default="{ data }">
-            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-5 gap-y-1 pr-2">
-              <span
-                >{{ data.title
-                }}<span v-if="!data.effective_status" class="text-xs text-g-500"
-                  >（已停用）</span
-                ></span
-              >
-              <div v-if="data.buttons.length" class="flex flex-wrap gap-x-4" @click.stop>
-                <ElCheckbox
-                  v-for="button in data.buttons"
-                  :key="button.key"
-                  :model-value="selectedIds.includes(button.permission_id)"
-                  :disabled="readOnly || loading || saving || !canSelect(button)"
-                  @change="togglePermission(button, $event === true)"
-                  >{{ button.title }}</ElCheckbox
-                >
-              </div>
-            </div>
-          </template>
-        </ElTree>
-        <ElEmpty
-          v-if="ready && !treeRows.length"
-          description="暂无可分配的菜单权限"
-          :image-size="64"
-        />
-      </ElScrollbar>
       <ElAlert
         v-if="visible && !loading && !ready"
         title="未能加载角色组资料，请关闭后重试。"
@@ -166,7 +165,13 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, type FormInstance, type FormRules, type TreeInstance } from 'element-plus'
+  import {
+    ElMessage,
+    type FormInstance,
+    type FormRules,
+    type TreeInstance,
+    type TreeNodeData
+  } from 'element-plus'
   import {
     fetchCreateRole,
     fetchGetRole,
@@ -182,7 +187,6 @@
   type PermissionNode = Api.SystemManage.MenuPermissionNode
   interface TreeRow extends Omit<PermissionNode, 'children'> {
     disabled: boolean
-    buttons: PermissionNode[]
     children: TreeRow[]
   }
 
@@ -270,17 +274,21 @@
 
   const treeRows = computed(() => {
     const convert = (nodes: PermissionNode[]): TreeRow[] =>
-      nodes
-        .filter((node) => node.type !== 'button')
-        .map((node) => ({
-          ...node,
-          disabled:
-            readOnly.value || loading.value || saving.value || !ready.value || !canSelect(node),
-          buttons: node.children.filter((child) => child.type === 'button'),
-          children: convert(node.children)
-        }))
+      nodes.map((node) => ({
+        ...node,
+        disabled:
+          readOnly.value || loading.value || saving.value || !ready.value || !canSelect(node),
+        children: convert(node.children)
+      }))
     return convert(permissionTree.value)
   })
+
+  function treeNodeClass(data: TreeNodeData): string {
+    if (data.type === 'button') return 'permission-operation-node'
+    if (data.type === 'menu') return 'permission-menu-node'
+    return ''
+  }
+
   const checkedKeys = computed(() => selectedIds.value.map((id) => `permission:${id}`))
   const rules: FormRules = {
     name: [{ required: true, whitespace: true, message: '请输入角色编码', trigger: 'blur' }],
@@ -429,3 +437,37 @@
     }
   }
 </script>
+
+<style>
+  .role-dialog {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 40px);
+  }
+
+  .role-dialog .el-dialog__header,
+  .role-dialog .el-dialog__footer {
+    flex-shrink: 0;
+  }
+
+  .role-dialog .el-dialog__body {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .role-dialog .permission-menu-node > .el-tree-node__children {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    padding-left: 36px;
+  }
+
+  .role-dialog .permission-operation-node {
+    flex: none;
+  }
+
+  .role-dialog .permission-operation-node > .el-tree-node__content {
+    min-height: 28px !important;
+    padding: 0 !important;
+  }
+</style>

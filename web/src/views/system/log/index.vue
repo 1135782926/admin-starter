@@ -8,7 +8,6 @@
         v-model="searchForm"
         :items="searchItems"
         label-position="top"
-        :default-expanded="true"
         @search="search"
         @reset="search"
       />

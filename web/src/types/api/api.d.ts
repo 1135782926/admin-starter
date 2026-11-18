@@ -222,6 +222,64 @@ declare namespace Api {
       permission_ids: number[]
     }
 
+    type MenuType = 'directory' | 'menu' | 'button'
+
+    type MenuOpenType = 'page' | 'external' | 'iframe'
+
+    interface MenuRecord {
+      id: number
+      parent_id: number | null
+      type: MenuType
+      title: string
+      name: string
+      permission_id: number | null
+      permission_name: string | null
+      open_type: MenuOpenType | null
+      path: string | null
+      component: string | null
+      url: string | null
+      icon: string | null
+      sort: number
+      keep_alive: boolean
+      status: boolean
+      remark: string | null
+      created_at: string | null
+      updated_at: string | null
+      children: MenuRecord[]
+    }
+
+    interface MenuSearchParams {
+      keyword?: string
+      type?: MenuType
+      status?: boolean
+    }
+
+    interface MenuInput {
+      parent_id: number | null
+      type: MenuType
+      title: string
+      name: string
+      open_type?: MenuOpenType
+      path?: string | null
+      component?: string | null
+      url?: string | null
+      icon?: string | null
+      sort?: number
+      keep_alive?: boolean
+      status?: boolean
+      remark?: string | null
+      buttons?: string[]
+    }
+
+    type MenuUpdateInput = Partial<Omit<MenuInput, 'type' | 'name' | 'buttons'>>
+
+    interface MenuDeletionImpact {
+      children_count: number
+      roles_count: number
+      direct_users_count: number
+      can_delete: boolean
+    }
+
     interface MenuPermissionNode {
       id: number
       key: string

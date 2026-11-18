@@ -98,6 +98,43 @@ export function resetRouteInitState(): void {
 }
 
 /**
+ * 菜单变更后刷新当前管理员信息、导航路由和按钮权限。
+ * 用于不退出登录的情况下让前端权限与后端菜单保持同步。
+ */
+export async function refreshAdminRouteContext(router: Router): Promise<void> {
+  if (!routeRegistry?.isRegistered() || !useUserStore().isLogin) return
+
+  const userStore = useUserStore()
+  const version = userStore.getSessionVersion()
+  const userInfo = await fetchGetUserInfo()
+  if (version !== userStore.getSessionVersion()) return
+  userStore.setUserInfo(userInfo)
+
+  const menuList = await menuProcessor.getMenuList()
+  if (version !== userStore.getSessionVersion()) return
+  if (!menuProcessor.validateMenuList(menuList)) {
+    throw new Error('获取菜单列表失败，请重新登录')
+  }
+
+  resetRouterState()
+  routeRegistry.register(menuList)
+  const menuStore = useMenuStore()
+  menuStore.setMenuList(menuList)
+  menuStore.addRemoveRouteFns(routeRegistry.getRemoveRouteFns() || [])
+  IframeRouteManager.getInstance().save()
+  useWorktabStore().validateWorktabs(router)
+
+  const current = router.currentRoute.value
+  const { homePath } = useCommon()
+  const validated = RoutePermissionValidator.validatePath(
+    current.path,
+    menuList,
+    homePath.value || '/'
+  )
+  await router.replace(validated.hasPermission ? current.fullPath : validated.path)
+}
+
+/**
  * 设置路由全局前置守卫
  */
 export function setupBeforeEachGuard(router: Router): void {

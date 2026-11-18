@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AdminMenuRequest;
 use App\Http\Resources\AdminMenuResource;
+use App\Http\Responses\ApiResponse;
 use App\Models\AdminMenu;
 use App\Services\AdminMenuAccess;
 use App\Services\AdminMenuService;
@@ -17,12 +18,12 @@ class MenuController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        return $this->success($this->tree($request));
+        return ApiResponse::success($this->tree($request));
     }
 
     public function permissionTree(Request $request): JsonResponse
     {
-        return $this->success($this->tree($request, true));
+        return ApiResponse::success($this->tree($request, true));
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -49,22 +50,22 @@ class MenuController extends Controller
 
     public function show(AdminMenu $menu): JsonResponse
     {
-        return $this->success(new AdminMenuResource($menu->load('permission')));
+        return ApiResponse::success(new AdminMenuResource($menu->load('permission')));
     }
 
     public function store(AdminMenuRequest $request): JsonResponse
     {
-        return $this->success(new AdminMenuResource($this->menus->create($request->validated())), 201);
+        return ApiResponse::success(new AdminMenuResource($this->menus->create($request->validated())), 201);
     }
 
     public function update(AdminMenuRequest $request, AdminMenu $menu): JsonResponse
     {
-        return $this->success(new AdminMenuResource($this->menus->update($menu, $request->validated())));
+        return ApiResponse::success(new AdminMenuResource($this->menus->update($menu, $request->validated())));
     }
 
     public function deletionImpact(AdminMenu $menu): JsonResponse
     {
-        return $this->success($this->menus->deletionImpact($menu));
+        return ApiResponse::success($this->menus->deletionImpact($menu));
     }
 
     public function destroy(Request $request, AdminMenu $menu): JsonResponse
@@ -72,16 +73,11 @@ class MenuController extends Controller
         $request->validate(['confirmed' => ['required', 'accepted']]);
         $this->menus->delete($menu);
 
-        return $this->success(null);
+        return ApiResponse::success(null);
     }
 
     public function current(Request $request): JsonResponse
     {
-        return $this->success($this->access->routes($request->user()));
-    }
-
-    private function success(mixed $data, int $status = 200): JsonResponse
-    {
-        return response()->json(['code' => 200, 'msg' => '操作成功', 'data' => $data], $status);
+        return ApiResponse::success($this->access->routes($request->user()));
     }
 }

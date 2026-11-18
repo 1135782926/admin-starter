@@ -26,8 +26,8 @@ class AdminRoleResource extends JsonResource
             'permissions_count' => count($this->permission_ids),
             'admins_count' => (int) $this->admins_count,
             'can_manage' => $this->can_manage,
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at?->toDateTimeString(),
+            'updated_at' => $this->updated_at?->toDateTimeString(),
         ];
     }
 }

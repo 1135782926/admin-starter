@@ -66,3 +66,49 @@ export function fetchGetMenuList() {
     url: '/api/v1/admin/me/menus'
   })
 }
+
+// 菜单管理树（含按钮和停用节点）
+export function fetchGetAdminMenus() {
+  return request.get<Api.SystemManage.MenuRecord[]>({
+    url: '/api/v1/admin/menus',
+    showErrorMessage: false
+  })
+}
+
+export function fetchGetAdminMenu(id: number) {
+  return request.get<Api.SystemManage.MenuRecord>({
+    url: `/api/v1/admin/menus/${id}`,
+    showErrorMessage: false
+  })
+}
+
+export function fetchCreateAdminMenu(data: Api.SystemManage.MenuInput) {
+  return request.post<Api.SystemManage.MenuRecord>({
+    url: '/api/v1/admin/menus',
+    data,
+    showErrorMessage: false
+  })
+}
+
+export function fetchUpdateAdminMenu(id: number, data: Api.SystemManage.MenuUpdateInput) {
+  return request.patch<Api.SystemManage.MenuRecord>({
+    url: `/api/v1/admin/menus/${id}`,
+    data,
+    showErrorMessage: false
+  })
+}
+
+export function fetchGetMenuDeletionImpact(id: number) {
+  return request.get<Api.SystemManage.MenuDeletionImpact>({
+    url: `/api/v1/admin/menus/${id}/deletion-impact`,
+    showErrorMessage: false
+  })
+}
+
+export function fetchDeleteAdminMenu(id: number) {
+  return request.del<null>({
+    url: `/api/v1/admin/menus/${id}`,
+    data: { confirmed: true },
+    showErrorMessage: false
+  })
+}

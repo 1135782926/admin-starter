@@ -49,9 +49,12 @@ export const useAuth = () => {
   const frontendAuthList = info.value?.buttons ?? []
 
   // 后端路由 meta 配置的权限列表（例如：[{ authMark: 'add' }]）
-  const backendAuthList: AuthItem[] = Array.isArray(route.meta.authList)
-    ? (route.meta.authList as AuthItem[])
-    : []
+  // 在调用时读取当前路由，保证动态路由刷新后按钮权限立即更新。
+  const backendAuthList = (): AuthItem[] => {
+    const currentList = route.meta.authList
+
+    return Array.isArray(currentList) ? (currentList as AuthItem[]) : []
+  }
 
   /**
    * 检查是否拥有某权限标识（前后端模式通用）
@@ -65,7 +68,7 @@ export const useAuth = () => {
     }
 
     // 后端模式
-    return backendAuthList.some((item) => item?.authMark === auth)
+    return backendAuthList().some((item) => item?.authMark === auth)
   }
 
   return {

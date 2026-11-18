@@ -4,6 +4,7 @@ use App\Models\AdminMenu;
 use App\Models\AdminPermission;
 use App\Models\AdminRole;
 use App\Models\AdminUser;
+use App\Models\User;
 use App\Services\AdminMenuAccess;
 use Database\Seeders\AdminMenuSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -55,6 +56,7 @@ test('initializes menu management permissions idempotently without creating acco
 });
 
 test('creates a page and the default four button permissions atomically', function (): void {
+    $this->travelTo('2026-11-18 02:41:19');
     $this->seed(AdminMenuSeeder::class);
     $admin = menuTestSuperAdmin();
 
@@ -64,6 +66,8 @@ test('creates a page and the default four button permissions atomically', functi
     ]);
 
     $response->assertSuccessful()->assertJsonPath('code', 200)->assertJsonPath('msg', '操作成功')
+        ->assertJsonPath('data.created_at', '2026-11-18 02:41:19')
+        ->assertJsonPath('data.updated_at', '2026-11-18 02:41:19')
         ->assertJsonPath('data.name', 'goods')->assertJsonPath('data.permission_name', 'goods.access');
     $menu = AdminMenu::query()->where('name', 'goods')->firstOrFail();
     expect(AdminMenu::query()->where('parent_id', $menu->id)->orderBy('id')->pluck('name')->all())
@@ -499,7 +503,7 @@ test('requires explicit deletion confirmation and preserves the leaf on 422', fu
     'confirmation declined' => [['confirmed' => false]],
 ]);
 
-test('previews distinct role and directly authorized administrator counts then removes the leaf and all grants', function (): void {
+test('previews distinct role and directly authorized user counts across models then removes the leaf and all grants', function (): void {
     $this->seed(AdminMenuSeeder::class);
     $admin = menuTestSuperAdmin();
     $menu = menuTestNode(['name' => 'goods']);
@@ -511,11 +515,13 @@ test('previews distinct role and directly authorized administrator counts then r
     $direct = AdminUser::factory()->create();
     $direct->assignRole([$first, $second]);
     $direct->givePermissionTo([$menu->permission_id, $button->permission_id]);
+    $ordinaryDirect = User::factory()->create(['id' => $direct->id]);
+    $ordinaryDirect->givePermissionTo($button->permission_id);
     $permissionId = $button->permission_id;
     $this->withToken($admin->createToken('delete')->plainTextToken);
 
     $this->getJson('/api/v1/admin/menus/'.$button->id.'/deletion-impact')->assertOk()->assertJsonPath('data', [
-        'children_count' => 0, 'roles_count' => 2, 'direct_users_count' => 1, 'can_delete' => true,
+        'children_count' => 0, 'roles_count' => 2, 'direct_users_count' => 2, 'can_delete' => true,
     ]);
     $this->deleteJson('/api/v1/admin/menus/'.$button->id, ['confirmed' => true])
         ->assertOk()->assertExactJson(['code' => 200, 'msg' => '操作成功', 'data' => null]);

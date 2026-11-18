@@ -42,6 +42,7 @@ function accountManagementPayload(AdminRole $role, array $changes = []): array
 }
 
 test('creates lists reads updates and deletes administrator accounts with real role assignments', function (): void {
+    $this->travelTo('2026-11-18 02:41:19');
     $this->seed([AdminMenuSeeder::class, AdminManagementMenuSeeder::class]);
     $actor = accountManagementSuperAdmin();
     $first = accountManagementRole('reader');
@@ -50,6 +51,8 @@ test('creates lists reads updates and deletes administrator accounts with real r
 
     $response = $this->postJson('/api/v1/admin/admins', accountManagementPayload($first))
         ->assertCreated()->assertJsonPath('code', 200)->assertJsonPath('msg', '操作成功')
+        ->assertJsonPath('data.created_at', '2026-11-18 02:41:19')
+        ->assertJsonPath('data.updated_at', '2026-11-18 02:41:19')
         ->assertJsonPath('data.username', 'new-operator')->assertJsonPath('data.role_ids', [$first->id])
         ->assertJsonMissingPaths(['data.password', 'data.remember_token', 'data.tokens']);
     $target = AdminUser::findOrFail($response->json('data.id'));
