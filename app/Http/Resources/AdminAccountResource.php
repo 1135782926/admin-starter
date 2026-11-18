@@ -25,6 +25,7 @@ class AdminAccountResource extends JsonResource
             'id' => $this->id,
             'username' => $this->username,
             'nickname' => $this->nickname,
+            'avatar' => filled($this->avatar) ? url($this->avatar) : null,
             'email' => $this->email,
             'mobile' => $this->mobile,
             'status' => (bool) $this->status,

@@ -40,12 +40,12 @@ class AdminUserController extends Controller
 
     public function store(AdminUserRequest $request): JsonResponse
     {
-        return ApiResponse::success(new AdminAccountResource($this->admins->create($request->user(), $request->validated())), 201);
+        return ApiResponse::success(new AdminAccountResource($this->admins->create($request, $request->validated())), 201);
     }
 
     public function update(AdminUserRequest $request, AdminUser $adminUser): JsonResponse
     {
-        return ApiResponse::success(new AdminAccountResource($this->admins->update($request->user(), $adminUser, $request->validated())));
+        return ApiResponse::success(new AdminAccountResource($this->admins->update($request, $adminUser, $request->validated())));
     }
 
     public function destroy(Request $request, AdminUser $adminUser): JsonResponse

@@ -8,14 +8,22 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
 
 class AdminUserService
 {
-    public function __construct(private AdminManagementScope $scope, private AdminMenuAccess $access) {}
+    public function __construct(
+        private AdminManagementScope $scope,
+        private AdminMenuAccess $access,
+        private AdminLogRecorder $logs,
+    ) {}
 
     /** @param array<string, mixed> $filters */
     public function paginate(AdminUser $actor, array $filters): LengthAwarePaginator
@@ -51,16 +59,19 @@ class AdminUserService
     }
 
     /** @param array<string, mixed> $data */
-    public function create(AdminUser $actor, array $data): AdminUser
+    public function create(Request $request, array $data): AdminUser
     {
         try {
-            return DB::transaction(function () use ($actor, $data): AdminUser {
+            return DB::transaction(function () use ($request, $data): AdminUser {
                 $admins = $this->lockManagementRows();
-                $actor = $this->authorizedActor($admins, $actor, 'create');
+                $actor = $this->authorizedActor($admins, $request->user(), 'create');
                 $roles = $this->assignmentRoles($actor, $data['role_ids']);
                 $this->validateUsername($data['username']);
                 $admin = new AdminUser;
                 $admin->fill(Arr::only($data, ['username', 'nickname', 'email', 'mobile', 'password', 'status']));
+                if (isset($data['avatar'])) {
+                    $this->storeAvatar($request, $admin, $data['avatar']);
+                }
                 $admin->save();
                 $admin->syncRoles($roles);
                 $this->invalidatePermissionsAfterCommit();
@@ -73,12 +84,12 @@ class AdminUserService
     }
 
     /** @param array<string, mixed> $data */
-    public function update(AdminUser $actor, AdminUser $admin, array $data): AdminUser
+    public function update(Request $request, AdminUser $admin, array $data): AdminUser
     {
         try {
-            return DB::transaction(function () use ($actor, $admin, $data): AdminUser {
+            return DB::transaction(function () use ($request, $admin, $data): AdminUser {
                 $admins = $this->lockManagementRows();
-                $actor = $this->authorizedActor($admins, $actor, 'update');
+                $actor = $this->authorizedActor($admins, $request->user(), 'update');
                 if ($actor->is($admin)) {
                     $actor->load('roles');
                     $ownRoleIds = array_key_exists('role_ids', $data) ? array_map('intval', $data['role_ids']) : $actor->roles->modelKeys();
@@ -98,6 +109,9 @@ class AdminUserService
                     unset($attributes['password']);
                 }
                 $admin->fill($attributes);
+                if (isset($data['avatar'])) {
+                    $this->storeAvatar($request, $admin, $data['avatar']);
+                }
                 $admin->save();
                 if ($roles !== null) {
                     $admin->syncRoles($roles);
@@ -126,8 +140,32 @@ class AdminUserService
             $admin->syncRoles([]);
             $admin->syncPermissions([]);
             $admin->delete();
+            $this->deleteAvatarAfterCommit($admin->avatar);
             $this->invalidatePermissionsAfterCommit();
         });
+    }
+
+    private function storeAvatar(Request $request, AdminUser $admin, UploadedFile $file): void
+    {
+        $path = $file->store('admin-avatars', 'public');
+        if ($path === false) {
+            throw new RuntimeException('头像文件写入存储失败。');
+        }
+
+        $this->logs->onRollback($request, function () use ($path): void {
+            if (! Storage::disk('public')->delete($path)) {
+                throw new RuntimeException('头像事务回滚后的文件清理失败。');
+            }
+        });
+        $this->deleteAvatarAfterCommit($admin->avatar);
+        $admin->avatar = '/storage/'.$path;
+    }
+
+    private function deleteAvatarAfterCommit(?string $avatar): void
+    {
+        if ($avatar !== null && preg_match('~\A/storage/(admin-avatars/[a-zA-Z0-9]{40}\.(?:jpe?g|png|webp|gif))\z~', $avatar, $matches)) {
+            DB::afterCommit(fn () => Storage::disk('public')->delete($matches[1]));
+        }
     }
 
     /** @return Collection<int, AdminUser> */

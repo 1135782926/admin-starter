@@ -9,7 +9,9 @@ use App\Models\User;
 use Database\Seeders\AdminManagementMenuSeeder;
 use Database\Seeders\AdminMenuSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\PersonalAccessToken;
 
 uses(LazilyRefreshDatabase::class);
@@ -360,7 +362,12 @@ test('returns 500 and rolls back administrator mutations and tokens when success
     $actor = auditLogSuperAdmin();
     $role = auditLogRole('audit-original-role');
     $replacement = auditLogRole('audit-replacement-role');
-    $target = AdminUser::factory()->create(['username' => 'audit-original-target', 'nickname' => 'Original nickname']);
+    $disk = Storage::fake('public');
+    $avatarPath = 'admin-avatars/'.str_repeat('a', 40).'.png';
+    $disk->put($avatarPath, 'original avatar');
+    $target = AdminUser::factory()->create([
+        'username' => 'audit-original-target', 'nickname' => 'Original nickname', 'avatar' => '/storage/'.$avatarPath,
+    ]);
     $target->assignRole($role);
     $targetToken = $target->createToken('must-survive-rollback')->plainTextToken;
     $originalPassword = $target->password;
@@ -378,9 +385,11 @@ test('returns 500 and rolls back administrator mutations and tokens when success
             'create' => $this->postJson('/api/v1/admin/admins', [
                 'username' => 'audit-rolled-back-create', 'nickname' => 'New account',
                 'password' => 'private-new-password', 'role_ids' => [$replacement->id],
+                'avatar' => UploadedFile::fake()->image('new.png'),
             ]),
             'update' => $this->patchJson('/api/v1/admin/admins/'.$target->id, [
                 'nickname' => 'Changed nickname', 'password' => 'private-new-password', 'role_ids' => [$replacement->id],
+                'avatar' => UploadedFile::fake()->image('replacement.png'),
             ]),
             'delete' => $this->deleteJson('/api/v1/admin/admins/'.$target->id, ['confirmed' => true]),
         })->assertServerError();
@@ -393,6 +402,8 @@ test('returns 500 and rolls back administrator mutations and tokens when success
     $this->assertModelExists($target);
     expect($target->fresh()->nickname)->toBe('Original nickname');
     expect($target->fresh()->password)->toBe($originalPassword);
+    expect($target->fresh()->avatar)->toBe('/storage/'.$avatarPath);
+    expect($disk->allFiles())->toBe([$avatarPath]);
     expect($target->roles()->pluck('id')->all())->toBe([$role->id]);
     expect(PersonalAccessToken::findToken($targetToken))->not->toBeNull();
     $this->assertDatabaseMissing('admin_model_has_roles', ['role_id' => $replacement->id]);

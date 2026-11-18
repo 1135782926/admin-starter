@@ -8,6 +8,17 @@
         </template>
       </ArtTableHeader>
       <ElTable v-loading="loading" :data="records" row-key="id" class="w-full">
+        <ElTableColumn label="头像" width="76" align="center">
+          <template #default="{ row }">
+            <ElAvatar
+              :size="32"
+              :src="row.avatar || defaultAvatar"
+              :alt="`${row.nickname || row.username}的头像`"
+            >
+              <img :src="defaultAvatar" alt="默认头像" />
+            </ElAvatar>
+          </template>
+        </ElTableColumn>
         <ElTableColumn prop="username" label="用户名" min-width="140" />
         <ElTableColumn prop="nickname" label="昵称" min-width="120" />
         <ElTableColumn prop="email" label="邮箱" min-width="180" show-overflow-tooltip />
@@ -71,6 +82,7 @@
 <script setup lang="ts">
   import { ElMessage, ElMessageBox } from 'element-plus'
   import { fetchDeleteAdmin, fetchGetAdminList } from '@/api/system-manage'
+  import defaultAvatar from '@imgs/user/avatar.webp'
   import { useAuth } from '@/hooks/core/useAuth'
   import { useUserStore } from '@/store/modules/user'
   import UserSearch from './modules/user-search.vue'

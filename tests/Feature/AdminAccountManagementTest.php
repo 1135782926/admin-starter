@@ -7,8 +7,10 @@ use App\Models\User;
 use Database\Seeders\AdminManagementMenuSeeder;
 use Database\Seeders\AdminMenuSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\PersonalAccessToken;
 use Spatie\Permission\Events\RoleAttachedEvent;
 
@@ -74,6 +76,61 @@ test('creates lists reads updates and deletes administrator accounts with real r
     $this->assertModelMissing($target);
     $this->assertDatabaseMissing('admin_model_has_roles', ['model_id' => $target->id, 'model_type' => $target->getMorphClass()]);
 });
+
+test('stores administrator avatars on create and replace and returns the saved image in list and detail', function (): void {
+    $this->seed([AdminMenuSeeder::class, AdminManagementMenuSeeder::class]);
+    $actor = accountManagementSuperAdmin();
+    $role = accountManagementRole('operator');
+    $disk = Storage::fake('public');
+    $this->withToken($actor->createToken('account-avatar')->plainTextToken)
+        ->withHeader('Accept', 'application/json');
+
+    $created = $this->post('/api/v1/admin/admins', accountManagementPayload($role, [
+        'avatar' => UploadedFile::fake()->image('first.png'), 'status' => '1',
+    ]))->assertCreated();
+    $target = AdminUser::findOrFail($created->json('data.id'));
+    $firstAvatar = $target->avatar;
+    $firstPath = str($firstAvatar)->after('/storage/')->toString();
+    $disk->assertExists($firstPath);
+    $created->assertJsonPath('data.avatar', url($firstAvatar));
+    $path = '/api/v1/admin/admins/'.$target->id;
+    $this->patchJson($path, ['nickname' => 'Renamed'])->assertOk()->assertJsonPath('data.avatar', url($firstAvatar));
+
+    $updated = $this->post($path, [
+        '_method' => 'PATCH', 'avatar' => UploadedFile::fake()->image('second.jpg'), 'status' => '0',
+    ])->assertOk()->assertJsonPath('data.status', false);
+    $avatar = $target->fresh()->avatar;
+    $avatarPath = str($avatar)->after('/storage/')->toString();
+    $disk->assertExists($avatarPath);
+    $disk->assertMissing($firstPath);
+    $updated->assertJsonPath('data.avatar', url($avatar));
+    $this->getJson($path)->assertOk()->assertJsonPath('data.avatar', url($avatar));
+    $this->getJson('/api/v1/admin/admins?keyword=new-operator')->assertOk()
+        ->assertJsonPath('data.records.0.avatar', url($avatar));
+
+    $this->deleteJson($path, ['confirmed' => true])->assertOk();
+    $disk->assertMissing($avatarPath);
+});
+
+test('returns 422 without replacing the avatar when an administrator uploads an invalid file', function (Closure $upload): void {
+    $this->seed([AdminMenuSeeder::class, AdminManagementMenuSeeder::class]);
+    $actor = accountManagementSuperAdmin();
+    $disk = Storage::fake('public');
+    $existingPath = 'admin-avatars/'.str_repeat('a', 40).'.png';
+    $disk->put($existingPath, 'original avatar');
+    $target = AdminUser::factory()->create(['avatar' => '/storage/'.$existingPath]);
+
+    $this->withToken($actor->createToken('invalid-avatar')->plainTextToken)
+        ->withHeader('Accept', 'application/json')
+        ->post('/api/v1/admin/admins/'.$target->id, ['_method' => 'PATCH', 'avatar' => $upload()])
+        ->assertUnprocessable()->assertJsonValidationErrors(['avatar']);
+
+    $this->assertDatabaseHas('admin_users', ['id' => $target->id, 'avatar' => '/storage/'.$existingPath]);
+    expect($disk->allFiles())->toBe([$existingPath]);
+})->with([
+    'non-image disguised as PNG' => [fn () => UploadedFile::fake()->create('not-an-image.png', 1, 'text/plain')],
+    'image over 2 MB' => [fn () => UploadedFile::fake()->image('large.png')->size(2049)],
+]);
 
 test('requires administrator authentication and rejects ordinary users with the same numeric identity', function (): void {
     $this->seed([AdminMenuSeeder::class, AdminManagementMenuSeeder::class]);

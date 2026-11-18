@@ -34,6 +34,7 @@ class AdminUserRequest extends FormRequest
         return [
             'username' => [$required, 'required', 'string', 'max:255', $username],
             'nickname' => [$required, 'required', 'string', 'max:255'],
+            'avatar' => ['sometimes', 'bail', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:2048'],
             'password' => $updating
                 ? ['sometimes', 'nullable', 'string', 'min:8', 'max:255']
                 : ['required', 'string', 'min:8', 'max:255'],

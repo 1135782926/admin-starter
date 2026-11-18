@@ -15,12 +15,38 @@ export function fetchGetAdmin(id: number) {
   return request.get<Api.SystemManage.AdminRecord>({ url: `/api/v1/admin/admins/${id}` })
 }
 
-export function fetchCreateAdmin(data: Api.SystemManage.AdminInput) {
-  return request.post<Api.SystemManage.AdminRecord>({ url: '/api/v1/admin/admins', data })
+export function fetchCreateAdmin(data: Api.SystemManage.AdminInput, avatar?: File) {
+  return request.post<Api.SystemManage.AdminRecord>({
+    url: '/api/v1/admin/admins',
+    data: avatar ? adminFormData(data, avatar) : data
+  })
 }
 
-export function fetchUpdateAdmin(id: number, data: Partial<Api.SystemManage.AdminInput>) {
-  return request.patch<Api.SystemManage.AdminRecord>({ url: `/api/v1/admin/admins/${id}`, data })
+export function fetchUpdateAdmin(
+  id: number,
+  data: Partial<Api.SystemManage.AdminInput>,
+  avatar?: File
+) {
+  const url = `/api/v1/admin/admins/${id}`
+  if (avatar) {
+    const formData = adminFormData(data, avatar)
+    formData.append('_method', 'PATCH')
+    return request.post<Api.SystemManage.AdminRecord>({ url, data: formData })
+  }
+  return request.patch<Api.SystemManage.AdminRecord>({ url, data })
+}
+
+function adminFormData(data: Partial<Api.SystemManage.AdminInput>, avatar: File) {
+  const formData = new FormData()
+  for (const [key, value] of Object.entries(data)) {
+    if (Array.isArray(value)) {
+      for (const id of value) formData.append(`${key}[]`, String(id))
+    } else if (value !== undefined) {
+      formData.append(key, typeof value === 'boolean' ? String(Number(value)) : (value ?? ''))
+    }
+  }
+  formData.append('avatar', avatar)
+  return formData
 }
 
 export function fetchDeleteAdmin(id: number) {

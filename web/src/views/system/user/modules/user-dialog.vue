@@ -17,20 +17,27 @@
         :closable="false"
         class="mb-4"
       />
-      <ElForm
+      <ArtForm
         ref="formRef"
-        :model="form"
+        v-model="form"
+        :items="formItems"
         :rules="rules"
+        :span="24"
+        :gutter="0"
         label-width="90px"
         :disabled="loading || saving || !ready"
+        :show-reset="false"
+        :show-submit="false"
       >
-        <ElFormItem label="用户名" prop="username">
-          <ElInput v-model="form.username" maxlength="255" autocomplete="off" />
-        </ElFormItem>
-        <ElFormItem label="昵称" prop="nickname">
-          <ElInput v-model="form.nickname" maxlength="255" />
-        </ElFormItem>
-        <ElFormItem label="密码" prop="password">
+        <template #avatar>
+          <ArtImageUpload
+            v-model="avatarFile"
+            :src="currentAdmin?.avatar"
+            :disabled="!canSave || loading || saving || !ready"
+            :allow-library="userStore.info.buttons?.includes('system.attachment.view')"
+          />
+        </template>
+        <template #password>
           <ElInput
             v-model="form.password"
             type="password"
@@ -40,35 +47,8 @@
             :placeholder="userData ? '留空保留原密码' : '至少 8 个字符'"
           />
           <p v-if="userData" class="text-xs text-g-500">修改密码后，该账号已有的登录会话将失效。</p>
-        </ElFormItem>
-        <ElFormItem label="邮箱" prop="email">
-          <ElInput v-model="form.email" maxlength="255" />
-        </ElFormItem>
-        <ElFormItem label="手机号" prop="mobile">
-          <ElInput v-model="form.mobile" maxlength="32" />
-        </ElFormItem>
-        <ElFormItem label="角色组" prop="role_ids">
-          <ElSelect
-            v-model="form.role_ids"
-            multiple
-            filterable
-            class="w-full"
-            :disabled="isSelf"
-            placeholder="请选择可分配的角色组"
-          >
-            <ElOption
-              v-for="role in roleOptions"
-              :key="role.id"
-              :value="role.id"
-              :disabled="!role.can_assign"
-              :label="`${role.display_name} (${role.name})${role.effective_status ? '' : ' · 已停用'}`"
-            />
-          </ElSelect>
-        </ElFormItem>
-        <ElFormItem label="启用">
-          <ElSwitch v-model="form.status" :disabled="isSelf" />
-        </ElFormItem>
-      </ElForm>
+        </template>
+      </ArtForm>
       <ElAlert
         v-if="visible && !loading && !ready"
         title="未能加载管理员资料，请关闭后重试。"
@@ -91,13 +71,15 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+  import { ElMessage, type FormRules } from 'element-plus'
   import {
     fetchCreateAdmin,
     fetchGetAdmin,
     fetchGetRoleOptions,
     fetchUpdateAdmin
   } from '@/api/system-manage'
+  import ArtForm, { type FormItem } from '@/components/core/forms/art-form/index.vue'
+  import ArtImageUpload from '@/components/core/forms/art-image-upload/index.vue'
   import { useAuth } from '@/hooks/core/useAuth'
   import { useUserStore } from '@/store/modules/user'
 
@@ -106,7 +88,8 @@
   const emit = defineEmits<{ submit: [] }>()
   const { hasAuth } = useAuth()
   const userStore = useUserStore()
-  const formRef = ref<FormInstance>()
+  const formRef = ref()
+  const avatarFile = shallowRef<File>()
   const roleOptions = ref<Api.SystemManage.RoleOption[]>([])
   const loading = ref(false)
   const saving = ref(false)
@@ -140,11 +123,44 @@
     ]
   }))
 
+  const formItems = computed<FormItem[]>(() => [
+    { label: '头像', key: 'avatar' },
+    {
+      label: '用户名',
+      key: 'username',
+      type: 'input',
+      props: { maxlength: 255, autocomplete: 'off' }
+    },
+    { label: '昵称', key: 'nickname', type: 'input', props: { maxlength: 255 } },
+    { label: '密码', key: 'password' },
+    { label: '邮箱', key: 'email', type: 'input', props: { maxlength: 255 } },
+    { label: '手机号', key: 'mobile', type: 'input', props: { maxlength: 32 } },
+    {
+      label: '角色组',
+      key: 'role_ids',
+      type: 'select',
+      props: {
+        multiple: true,
+        filterable: true,
+        class: 'w-full',
+        disabled: isSelf.value,
+        placeholder: '请选择可分配的角色组',
+        options: roleOptions.value.map((role) => ({
+          value: role.id,
+          disabled: !role.can_assign,
+          label: `${role.display_name} (${role.name})${role.effective_status ? '' : ' · 已停用'}`
+        }))
+      }
+    },
+    { label: '启用', key: 'status', type: 'switch', props: { disabled: isSelf.value } }
+  ])
+
   watch(visible, async (open) => {
     const id = ++loadId
     ready.value = false
     if (!open) {
       form.password = ''
+      avatarFile.value = undefined
       return
     }
     loading.value = true
@@ -178,7 +194,7 @@
         })
       ready.value = true
       await nextTick()
-      formRef.value?.clearValidate()
+      formRef.value?.ref?.clearValidate()
     } catch {
       // HTTP 统一显示请求错误，并拒绝旧会话响应。
     } finally {
@@ -192,16 +208,16 @@
     saving.value = true
     try {
       const data: Api.SystemManage.AdminInput = {
-        username: form.username.trim(),
-        nickname: form.nickname.trim(),
-        email: form.email.trim() || null,
-        mobile: form.mobile.trim() || null,
+        username: (form.username || '').trim(),
+        nickname: (form.nickname || '').trim(),
+        email: (form.email || '').trim() || null,
+        mobile: (form.mobile || '').trim() || null,
         status: form.status,
         role_ids: [...form.role_ids],
         ...(form.password ? { password: form.password } : {})
       }
-      if (props.userData) await fetchUpdateAdmin(props.userData.id, data)
-      else await fetchCreateAdmin(data)
+      if (props.userData) await fetchUpdateAdmin(props.userData.id, data, avatarFile.value)
+      else await fetchCreateAdmin(data, avatarFile.value)
       ElMessage.success('管理员已保存')
       visible.value = false
       emit('submit')
