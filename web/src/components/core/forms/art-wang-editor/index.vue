@@ -72,7 +72,7 @@
 
   // 常量配置
   const DEFAULT_UPLOAD_CONFIG = {
-    maxFileSize: 3 * 1024 * 1024, // 3MB
+    maxFileSize: 50 * 1024 * 1024, // 50MB
     maxNumberOfFiles: 10,
     fieldName: 'file',
     allowedFileTypes: ['image/*']

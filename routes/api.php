@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\Common\WangEditorUploadController;
 use App\Http\Controllers\Api\V1\Admin\AdminLogController;
 use App\Http\Controllers\Api\V1\Admin\AdminUserController;
+use App\Http\Controllers\Api\V1\Admin\AttachmentController;
 use App\Http\Controllers\Api\V1\Admin\AuthController;
 use App\Http\Controllers\Api\V1\Admin\MenuController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
@@ -14,6 +16,8 @@ Route::get('/user', function (Request $request) {
 
 Route::prefix('v1/admin')->name('admin.')->group(function (): void {
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:admin-login')->name('login');
+    Route::get('attachments/{attachment}/file', [AttachmentController::class, 'file'])
+        ->middleware('signed')->name('attachments.file');
 
     Route::middleware('admin.auth')->group(function (): void {
         Route::get('me', [AuthController::class, 'me'])->name('me');
@@ -46,5 +50,16 @@ Route::prefix('v1/admin')->name('admin.')->group(function (): void {
         Route::post('menus', [MenuController::class, 'store'])->middleware('admin.permission:system.menu.create')->name('menus.store');
         Route::patch('menus/{menu}', [MenuController::class, 'update'])->middleware('admin.permission:system.menu.update')->name('menus.update');
         Route::delete('menus/{menu}', [MenuController::class, 'destroy'])->middleware('admin.permission:system.menu.delete')->name('menus.destroy');
+
+        Route::get('attachments', [AttachmentController::class, 'index'])->middleware('admin.permission:system.attachment.view')->name('attachments.index');
+        Route::get('attachments/{attachment}', [AttachmentController::class, 'show'])->middleware('admin.permission:system.attachment.view')->name('attachments.show');
+        Route::post('attachments', [AttachmentController::class, 'store'])->middleware(['admin.permission:system.attachment.create', 'throttle:attachment-upload'])->name('attachments.store');
+        Route::patch('attachments/{attachment}', [AttachmentController::class, 'update'])->middleware('admin.permission:system.attachment.update')->name('attachments.update');
+        Route::delete('attachments/{attachment}', [AttachmentController::class, 'destroy'])->middleware('admin.permission:system.attachment.delete')->name('attachments.destroy');
+        Route::get('attachments/{attachment}/temporary-url', [AttachmentController::class, 'temporaryUrl'])->middleware('admin.permission:system.attachment.view')->name('attachments.temporary-url');
     });
 });
+
+Route::post('common/upload/wangeditor', WangEditorUploadController::class)
+    ->middleware(['admin.auth', 'admin.permission:system.attachment.create', 'throttle:attachment-upload'])
+    ->name('admin.wangeditor.store');

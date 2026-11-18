@@ -2,7 +2,8 @@ export const moduleLabels: Record<Api.SystemManage.AdminLogModule, string> = {
   auth: '登录认证',
   admin: '管理员',
   role: '角色组',
-  menu: '菜单'
+  menu: '菜单',
+  attachment: '附件'
 }
 
 export const actionLabels: Record<Api.SystemManage.AdminLogAction, string> = {

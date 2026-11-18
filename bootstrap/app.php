@@ -33,7 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
         $exceptions->respond(function (Response $response) {
-            if (! request()->is('api/v1/admin/*') || $response->getStatusCode() < 400) {
+            if ((! request()->is('api/v1/admin/*') && ! request()->is('api/common/upload/wangeditor')) || $response->getStatusCode() < 400) {
                 return $response;
             }
 

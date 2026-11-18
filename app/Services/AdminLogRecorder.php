@@ -6,6 +6,7 @@ use App\Models\AdminLog;
 use App\Models\AdminMenu;
 use App\Models\AdminRole;
 use App\Models\AdminUser;
+use App\Models\Attachment;
 use Closure;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\Model;
@@ -32,6 +33,10 @@ class AdminLogRecorder
         'admin.menus.store' => ['menu', 'create', 'menu', null],
         'admin.menus.update' => ['menu', 'update', 'menu', 'menu'],
         'admin.menus.destroy' => ['menu', 'delete', 'menu', 'menu'],
+        'admin.attachments.store' => ['attachment', 'create', 'attachment', null],
+        'admin.attachments.update' => ['attachment', 'update', 'attachment', 'attachment'],
+        'admin.attachments.destroy' => ['attachment', 'delete', 'attachment', 'attachment'],
+        'admin.wangeditor.store' => ['attachment', 'create', 'attachment', null],
     ];
 
     public function prepare(Request $request): bool
@@ -42,7 +47,11 @@ class AdminLogRecorder
         }
         $request->attributes->set('admin_log.plan', $plan);
         $request->attributes->set('admin_log.started', hrtime(true));
-        $request->attributes->set('admin_log.state', new ParameterBag(['recorded' => false, 'login_actor' => null]));
+        $request->attributes->set('admin_log.state', new ParameterBag([
+            'recorded' => false,
+            'login_actor' => null,
+            'rollback_callbacks' => [],
+        ]));
 
         return true;
     }
@@ -52,6 +61,15 @@ class AdminLogRecorder
         $plan = $request->attributes->get('admin_log.plan');
 
         return $plan && $plan[0] !== 'auth';
+    }
+
+    /** @param Closure(): void $callback */
+    public function onRollback(Request $request, Closure $callback): void
+    {
+        $state = $request->attributes->get('admin_log.state');
+        $callbacks = $state->get('rollback_callbacks', []);
+        $callbacks[] = $callback;
+        $state->set('rollback_callbacks', $callbacks);
     }
 
     /** @param Closure(): Response $next */
@@ -73,6 +91,7 @@ class AdminLogRecorder
             $response = $next();
             if (! $response->isSuccessful()) {
                 DB::rollBack($level);
+                $this->runRollbackCallbacks($request);
 
                 return $response;
             }
@@ -84,7 +103,25 @@ class AdminLogRecorder
             if (DB::transactionLevel() > $level) {
                 DB::rollBack($level);
             }
+            $this->runRollbackCallbacks($request);
             throw $exception;
+        }
+    }
+
+    private function runRollbackCallbacks(Request $request): void
+    {
+        $state = $request->attributes->get('admin_log.state');
+        $callbacks = array_reverse($state->get('rollback_callbacks', []));
+        $state->set('rollback_callbacks', []);
+        foreach ($callbacks as $callback) {
+            try {
+                $callback();
+            } catch (Throwable $exception) {
+                Log::warning('管理员事务回滚清理失败', [
+                    'route' => $request->route()?->getName(),
+                    'exception_type' => $exception::class,
+                ]);
+            }
         }
     }
 
@@ -260,6 +297,14 @@ class AdminLogRecorder
             $role = AdminRole::with('permissions')->find($id);
 
             return $role ? $this->roleSnapshot($role) : [];
+        }
+        if ($module === 'attachment') {
+            $attachment = Attachment::find($id);
+
+            return $attachment ? $attachment->only([
+                'title', 'original_name', 'category', 'extension', 'mime_type', 'size', 'sha256',
+                'width', 'height', 'disk', 'object_key', 'visibility', 'is_image', 'admin_user_id',
+            ]) : [];
         }
         $menu = AdminMenu::find($id);
 

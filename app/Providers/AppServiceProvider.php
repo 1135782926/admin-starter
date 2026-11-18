@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\AdminUser;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -26,5 +27,11 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(5)->by('account:'.hash('sha256', mb_strtolower(trim(is_string($request->input('userName')) ? $request->input('userName') : '')).'|'.$request->ip())),
             Limit::perMinute(60)->by('ip:'.$request->ip()),
         ]);
+        RateLimiter::for('attachment-upload', function (Request $request): Limit {
+            $actor = $request->user();
+
+            return Limit::perMinute((int) config('attachments.uploads_per_minute', 30))
+                ->by($actor instanceof AdminUser ? 'admin:'.$actor->id : 'ip:'.$request->ip());
+        });
     }
 }

@@ -84,12 +84,71 @@ declare namespace Api {
     }
   }
 
+  /** 附件管理类型 */
+  namespace Attachment {
+    type Visibility = 'private' | 'public'
+    type FileType = 'image' | 'document' | 'archive' | 'text'
+    type Disposition = 'inline' | 'attachment'
+
+    interface Uploader {
+      id: number
+      username: string
+      nickname: string | null
+    }
+
+    interface Record {
+      id: number
+      title: string
+      original_name: string
+      category: string | null
+      extension: string
+      mime_type: string
+      size: number
+      sha256: string
+      width: number | null
+      height: number | null
+      disk: string
+      object_key: string
+      visibility: Visibility
+      is_image: boolean
+      url: string | null
+      uploader: Uploader | null
+      created_at: string
+      updated_at: string
+    }
+
+    interface SearchParams {
+      page?: number
+      per_page?: number
+      keyword?: string
+      category?: string
+      type?: FileType
+      visibility?: Visibility
+      admin_user_id?: number
+      date_from?: string
+      date_to?: string
+    }
+
+    type List = Api.Common.PaginatedResponse<Record>
+
+    interface UpdateInput {
+      title: string
+      category: string | null
+    }
+
+    interface TemporaryUrl {
+      url: string
+      expires_at: string
+    }
+  }
+
   /** 系统管理类型 */
   namespace SystemManage {
     interface AdminRecord {
       id: number
       username: string
       nickname: string | null
+      avatar: string | null
       email: string | null
       mobile: string | null
       status: boolean
@@ -109,7 +168,7 @@ declare namespace Api {
 
     type AdminList = Api.Common.PaginatedResponse<AdminRecord>
 
-    type AdminLogModule = 'auth' | 'admin' | 'role' | 'menu'
+    type AdminLogModule = 'auth' | 'admin' | 'role' | 'menu' | 'attachment'
     type AdminLogAction = 'login' | 'logout' | 'create' | 'update' | 'delete'
     type AdminLogValue =
       | string
@@ -135,7 +194,7 @@ declare namespace Api {
       route_name: string
       method: string
       path: string
-      target_type: 'admin' | 'role' | 'menu' | null
+      target_type: 'admin' | 'role' | 'menu' | 'attachment' | null
       target_id: number | null
       target_label: string | null
       status_code: number
