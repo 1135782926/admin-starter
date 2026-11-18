@@ -30,7 +30,9 @@ export interface ErrorResponse {
   /** 错误状态码 */
   code: number
   /** 错误消息 */
-  msg: string
+  msg?: string
+  message?: string
+  errors?: Record<string, string[]>
   /** 错误附加数据 */
   data?: unknown
 }
@@ -126,7 +128,9 @@ export function handleError(error: AxiosError<ErrorResponse>): never {
   }
 
   const statusCode = error.response?.status
-  const errorMessage = error.response?.data?.msg || error.message
+  const response = error.response?.data
+  const fieldErrors = response?.errors ? Object.values(response.errors).flat().join('；') : ''
+  const errorMessage = fieldErrors || response?.msg || response?.message
   const requestConfig = error.config
 
   // 处理网络错误
@@ -138,9 +142,8 @@ export function handleError(error: AxiosError<ErrorResponse>): never {
   }
 
   // 处理 HTTP 状态码错误
-  const message = statusCode
-    ? getErrorMessage(statusCode)
-    : errorMessage || $t('httpMsg.requestFailed')
+  const message =
+    errorMessage || (statusCode ? getErrorMessage(statusCode) : $t('httpMsg.requestFailed'))
   throw new HttpError(message, statusCode || ApiStatus.error, {
     data: error.response.data,
     url: requestConfig?.url,

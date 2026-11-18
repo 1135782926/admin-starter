@@ -25,12 +25,10 @@ export class MenuProcessor {
     let menuList: AppRouteRecord[]
     if (isFrontendMode.value) {
       menuList = await this.processFrontendMenu()
+      this.validateMenuPaths(menuList)
     } else {
       menuList = await this.processBackendMenu()
     }
-
-    // 在规范化路径之前，验证原始路径配置
-    this.validateMenuPaths(menuList)
 
     // 规范化路径（将相对路径转换为完整路径）
     return this.normalizeMenuPaths(menuList)
@@ -122,7 +120,7 @@ export class MenuProcessor {
    * 验证菜单列表是否有效
    */
   validateMenuList(menuList: AppRouteRecord[]): boolean {
-    return Array.isArray(menuList) && menuList.length > 0
+    return Array.isArray(menuList)
   }
 
   /**

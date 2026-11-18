@@ -36,7 +36,6 @@
  * @author Art Design Pro Team
  */
 import type { Router, RouteLocationNormalized, NavigationGuardNext } from 'vue-router'
-import { nextTick } from 'vue'
 import NProgress from 'nprogress'
 import { useSettingStore } from '@/store/modules/setting'
 import { useUserStore } from '@/store/modules/user'
@@ -127,10 +126,8 @@ export function setupBeforeEachGuard(router: Router): void {
  */
 function closeLoading(): void {
   if (pendingLoading) {
-    nextTick(() => {
-      loadingService.hideLoading()
-      pendingLoading = false
-    })
+    pendingLoading = false
+    loadingService.hideLoading()
   }
 }
 
@@ -153,6 +150,10 @@ async function handleRouteGuard(
 
   // 1. 检查登录状态
   if (!handleLoginStatus(to, userStore, next)) {
+    return
+  }
+  if (to.name === 'Login') {
+    next()
     return
   }
 
@@ -207,12 +208,15 @@ function handleLoginStatus(
   next: NavigationGuardNext
 ): boolean {
   // 已登录或访问登录页或静态路由，直接放行
-  if (userStore.isLogin || to.path === RoutesAlias.Login || isStaticRoute(to.path)) {
+  if (
+    (userStore.isLogin && userStore.accessToken) ||
+    to.path === RoutesAlias.Login ||
+    isStaticRoute(to.path)
+  ) {
     return true
   }
 
   // 未登录且访问需要权限的页面，跳转到登录页并携带 redirect 参数
-  userStore.logOut()
   next({
     name: 'Login',
     query: { redirect: to.fullPath }
@@ -226,6 +230,7 @@ function handleLoginStatus(
 function isStaticRoute(path: string): boolean {
   const checkRoute = (routes: any[], targetPath: string): boolean => {
     return routes.some((route) => {
+      if (route.meta?.requiresAuth) return false
       // 404 catch-all 路由不应视为可匿名访问的静态页，
       // 否则未登录时手动输入任意地址会直接落到 404，无法跳转登录页。
       if (route.name === 'Exception404') {
@@ -260,17 +265,29 @@ async function handleDynamicRoutes(
 ): Promise<void> {
   // 标记初始化进行中
   routeInitInProgress = true
+  const userStore = useUserStore()
+  const sessionVersion = userStore.getSessionVersion()
 
   // 显示 loading
   pendingLoading = true
   loadingService.showLoading()
 
   try {
-    // 1. 获取用户信息
-    await fetchUserInfo()
+    // 每次异步边界都确认会话，旧账号不能写入新账号的状态。
+    const userInfo = await fetchGetUserInfo()
+    if (sessionVersion !== userStore.getSessionVersion()) {
+      next(false)
+      return
+    }
+    userStore.setUserInfo(userInfo)
+    userStore.checkAndClearWorktabs()
 
     // 2. 获取菜单数据
     const menuList = await menuProcessor.getMenuList()
+    if (sessionVersion !== userStore.getSessionVersion()) {
+      next(false)
+      return
+    }
 
     // 3. 验证菜单数据
     if (!menuProcessor.validateMenuList(menuList)) {
@@ -290,6 +307,12 @@ async function handleDynamicRoutes(
 
     // 7. 验证工作标签页
     useWorktabStore().validateWorktabs(router)
+    if (menuList.length === 0) {
+      routeInitInProgress = false
+      closeLoading()
+      next({ name: 'NoAccessibleMenus', replace: true })
+      return
+    }
 
     // 8. 静态路由不依赖菜单权限，初始化后直接恢复目标地址。
     if (isStaticRoute(to.path)) {
@@ -337,6 +360,10 @@ async function handleDynamicRoutes(
       })
     }
   } catch (error) {
+    if (sessionVersion !== userStore.getSessionVersion()) {
+      next(false)
+      return
+    }
     console.error('[RouteGuard] 动态路由注册失败:', error)
 
     // 关闭 loading
@@ -365,31 +392,16 @@ async function handleDynamicRoutes(
 }
 
 /**
- * 获取用户信息
- */
-async function fetchUserInfo(): Promise<void> {
-  const userStore = useUserStore()
-  const data = await fetchGetUserInfo()
-  userStore.setUserInfo(data)
-  // 检查并清理工作台标签页（如果是不同用户登录）
-  userStore.checkAndClearWorktabs()
-}
-
-/**
  * 重置路由相关状态
  */
-export function resetRouterState(delay: number): void {
-  setTimeout(() => {
-    routeRegistry?.unregister()
-    IframeRouteManager.getInstance().clear()
-
-    const menuStore = useMenuStore()
-    menuStore.removeAllDynamicRoutes()
-    menuStore.setMenuList([])
-
-    // 重置路由初始化状态，允许重新登录后再次初始化
-    resetRouteInitState()
-  }, delay)
+export function resetRouterState(): void {
+  routeRegistry?.unregister()
+  IframeRouteManager.getInstance().clear()
+  const menuStore = useMenuStore()
+  menuStore.removeAllDynamicRoutes()
+  menuStore.setMenuList([])
+  resetRouteInitState()
+  closeLoading()
 }
 
 /**

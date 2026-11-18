@@ -111,10 +111,9 @@
 
   const route = useRoute()
   const userStore = useUserStore()
-  const { accessToken } = userStore
 
-  const uploadImageUrl = `${import.meta.env.VITE_API_URL}/api/common/upload`
-  const uploadHeaders = { Authorization: accessToken }
+  const uploadImageUrl = `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api/common/upload`
+  const uploadHeaders = computed(() => ({ Authorization: `Bearer ${userStore.accessToken}` }))
 
   const pageMode = ref<PageModeEnum>(PageModeEnum.Add)
   const articleName = ref('')

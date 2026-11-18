@@ -11,6 +11,7 @@ import type { RouteRecordRaw } from 'vue-router'
 import type { AppRouteRecord } from '@/types/router'
 import { ComponentLoader } from './ComponentLoader'
 import { IframeRouteManager } from './IframeRouteManager'
+import { RoutesAlias } from '../routesAlias'
 
 interface ConvertedRoute extends Omit<RouteRecordRaw, 'children'> {
   id?: number
@@ -42,6 +43,8 @@ export class RouteTransformer {
     // 处理不同类型的路由
     if (route.meta.isIframe) {
       this.handleIframeRoute(converted, route, depth)
+    } else if (depth === 0 && component === RoutesAlias.Layout) {
+      converted.component = this.componentLoader.loadLayout()
     } else if (this.isFirstLevelRoute(route, depth)) {
       this.handleFirstLevelRoute(converted, route, component as string)
     } else {

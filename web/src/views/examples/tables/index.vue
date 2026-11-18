@@ -248,11 +248,11 @@
             <ElAvatar :src="row.avatar" :size="40" />
             <div class="flex-1 min-w-0">
               <p class="m-0 overflow-hidden font-medium text-ellipsis whitespace-nowrap">{{
-                row.userName
+                row.username
               }}</p>
               <p
                 class="m-0 mt-1 overflow-hidden text-xs text-g-700 text-ellipsis whitespace-nowrap"
-                >{{ row.userEmail }}</p
+                >{{ row.email }}</p
               >
             </div>
           </div>
@@ -293,7 +293,7 @@
         </template>
 
         <!-- 自定义手机号表头 -->
-        <template #userPhone-header="{ column }">
+        <template #mobile-header="{ column }">
           <ElPopover placement="bottom" :width="200" trigger="hover">
             <template #reference>
               <div class="inline-block gap-1 text-theme c-p custom-header">
@@ -437,13 +437,13 @@
   } from '@element-plus/icons-vue'
   import { ElMessageBox } from 'element-plus'
   import { useTable, CacheInvalidationStrategy } from '@/hooks/core/useTable'
-  import { fetchGetUserList } from '@/api/system-manage'
+  import { fetchGetAdminList } from '@/api/system-manage'
   import { ACCOUNT_TABLE_DATA } from '@/mock/temp/formData'
   import { getColumnKey } from '@/hooks/core/useTableColumns'
 
   defineOptions({ name: 'AdvancedTableDemo' })
 
-  type UserListItem = Api.SystemManage.UserListItem
+  type UserListItem = Api.SystemManage.AdminRecord
 
   // 选中的行
   const selectedRows = ref<UserListItem[]>([])
@@ -504,21 +504,13 @@
   const searchFormState = ref({
     name: '',
     phone: '',
-    status: '1',
+    status: '',
     department: '',
     daterange: ['2025-01-01', '2025-02-10']
   })
 
   // 搜索表单状态
   // const searchFormState = ref({ ...defaultFilter.value })
-
-  // 用户状态配置
-  const USER_STATUS_CONFIG = {
-    '1': { type: 'success' as const, text: '在线' },
-    '2': { type: 'info' as const, text: '离线' },
-    '3': { type: 'warning' as const, text: '异常' },
-    '4': { type: 'danger' as const, text: '注销' }
-  } as const
 
   // 搜索表单配置
   // 日期选择器有多种类型，具体可以查看 src/components/core/forms/art-search-bar/widget/art-search-date/README.md 文档
@@ -546,10 +538,8 @@
       type: 'select',
       options: [
         { label: '全部', value: '' },
-        { label: '在线', value: '1' },
-        { label: '离线', value: '2' },
-        { label: '异常', value: '3' },
-        { label: '注销', value: '4' }
+        { label: '启用', value: '1' },
+        { label: '禁用', value: '2' }
       ]
     },
     {
@@ -580,27 +570,21 @@
 
   // 导出列配置
   const exportColumns = computed(() => ({
-    userName: { title: '用户名', width: 15 },
-    userEmail: { title: '邮箱', width: 20 },
-    userPhone: { title: '手机号', width: 15 },
-    userGender: { title: '性别', width: 10 },
+    username: { title: '用户名', width: 15 },
+    email: { title: '邮箱', width: 20 },
+    mobile: { title: '手机号', width: 15 },
+    nickname: { title: '昵称', width: 10 },
     department: { title: '部门', width: 15 },
     status: {
       title: '状态',
       width: 10,
-      formatter: (value: string) => getUserStatusConfig(value).text
+      formatter: (value: boolean) => getUserStatusConfig(value).text
     }
   }))
 
   // 获取用户状态配置
-  const getUserStatusConfig = (status: string) => {
-    return (
-      USER_STATUS_CONFIG[status as keyof typeof USER_STATUS_CONFIG] || {
-        type: 'info' as const,
-        text: '未知'
-      }
-    )
-  }
+  const getUserStatusConfig = (status: boolean) =>
+    status ? { type: 'success' as const, text: '启用' } : { type: 'info' as const, text: '禁用' }
 
   const buildSearchParams = (params: typeof searchFormState.value) => {
     const { daterange, ...filtersParams } = params
@@ -702,7 +686,12 @@
         // 记录缓存键（这里假设会被缓存）
         updateCacheKeys(requestKey)
 
-        return fetchGetUserList(params)
+        return fetchGetAdminList({
+          page: params.current,
+          per_page: params.size,
+          keyword: params.name || params.phone || undefined,
+          status: params.status === '1' ? true : params.status === '2' ? false : undefined
+        })
       },
       apiParams: {
         current: 1,
@@ -725,12 +714,12 @@
         //   formatter: (row) =>
         //     h('div', { style: 'padding: 10px 30px' }, [
         //       h('p', {}, '用户ID: ' + row.id),
-        //       h('p', {}, '用户名: ' + row.userName),
-        //       h('p', {}, '手机号: ' + row.userPhone),
-        //       h('p', {}, '邮箱: ' + row.userEmail),
-        //       h('p', {}, '性别: ' + row.userGender),
+        //       h('p', {}, '用户名: ' + row.username),
+        //       h('p', {}, '手机号: ' + row.mobile),
+        //       h('p', {}, '邮箱: ' + row.email),
+        //       h('p', {}, '昵称: ' + row.nickname),
         //       h('p', {}, '状态: ' + row.status),
-        //       h('p', {}, '创建日期: ' + row.createTime)
+        //       h('p', {}, '创建日期: ' + row.created_at)
         //     ])
         // },
         { type: 'selection', width: 50 },
@@ -746,13 +735,13 @@
           // visible: false, // 隐藏列
         },
         {
-          prop: 'userGender',
-          label: '性别',
+          prop: 'nickname',
+          label: '昵称',
           sortable: true,
-          formatter: (row) => row.userGender || '未知'
+          formatter: (row) => row.nickname || '未设置'
         },
         {
-          prop: 'userPhone',
+          prop: 'mobile',
           label: '手机号',
           useHeaderSlot: true,
           sortable: true
@@ -795,8 +784,7 @@
           department: ['技术部', '产品部', '运营部', '市场部', '设计部'][
             Math.floor(Math.random() * 5)
           ],
-          score: Math.floor(Math.random() * 5) + 1,
-          status: ['1', '2', '3', '4'][Math.floor(Math.random() * 4)]
+          score: Math.floor(Math.random() * 5) + 1
         }))
       }
       // 自定义响应适配器，处理后端特殊的返回格式
@@ -862,7 +850,7 @@
 
   const handleRowClick = (row: UserListItem) => {
     console.log('行点击:', row)
-    logEvent('行点击', `点击了用户: ${row.userName}`)
+    logEvent('行点击', `点击了用户: ${row.username}`)
   }
 
   /**
@@ -1003,7 +991,7 @@
   }
 
   const handleEdit = (row: UserListItem) => {
-    ElMessage.success(`编辑用户 ${row.userName} 成功`)
+    ElMessage.success(`编辑用户 ${row.username} 成功`)
     setTimeout(() => {
       refreshUpdate()
     }, 1000)
@@ -1011,7 +999,7 @@
 
   const handleDelete = async (row: UserListItem) => {
     try {
-      await ElMessageBox.confirm(`确定要删除用户 ${row.userName} 吗？`, '警告', {
+      await ElMessageBox.confirm(`确定要删除用户 ${row.username} 吗？`, '警告', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
@@ -1027,7 +1015,7 @@
   }
 
   const handleView = (row: UserListItem) => {
-    ElMessage.info(`查看用户 ${row.userName}`)
+    ElMessage.info(`查看用户 ${row.username}`)
   }
 
   const handleBatchDelete = async () => {
@@ -1238,8 +1226,8 @@
 
       case 'toggleColumn': {
         // 切换单个列显示/隐藏
-        if (getColumnConfig?.('userPhone')) {
-          toggleColumn?.('userPhone')
+        if (getColumnConfig?.('mobile')) {
+          toggleColumn?.('mobile')
           ElMessage.success('已切换手机号列显示状态')
         }
         break
@@ -1247,8 +1235,8 @@
 
       case 'batchToggleColumns': {
         // 批量切换多个列显示/隐藏
-        toggleColumn?.(['userGender', 'userPhone'])
-        ElMessage.success('已批量切换性别和手机号列显示状态')
+        toggleColumn?.(['nickname', 'mobile'])
+        ElMessage.success('已批量切换昵称和手机号列显示状态')
         break
       }
 
@@ -1268,7 +1256,7 @@
 
       case 'updateColumn': {
         // 更新单个列
-        updateColumn?.('userPhone', {
+        updateColumn?.('mobile', {
           label: '联系电话',
           width: 140
         })
@@ -1279,10 +1267,10 @@
       case 'batchUpdateColumns': {
         // 批量更新多个列（新语法）
         updateColumn?.([
-          { prop: 'userGender', updates: { width: 200, label: '性别-已更新', sortable: false } },
-          { prop: 'userPhone', updates: { width: 200, label: '手机号-已更新', sortable: false } }
+          { prop: 'nickname', updates: { width: 200, label: '昵称-已更新', sortable: false } },
+          { prop: 'mobile', updates: { width: 200, label: '手机号-已更新', sortable: false } }
         ])
-        ElMessage.success('已批量更新性别和手机号列')
+        ElMessage.success('已批量更新昵称和手机号列')
         break
       }
 
@@ -1290,12 +1278,12 @@
         // 交换列位置
         const allCols = getAllColumns?.()
         if (allCols) {
-          const genderIndex = allCols.findIndex((col) => getColumnKey(col) === 'userGender')
-          const phoneIndex = allCols.findIndex((col) => getColumnKey(col) === 'userPhone')
+          const genderIndex = allCols.findIndex((col) => getColumnKey(col) === 'nickname')
+          const phoneIndex = allCols.findIndex((col) => getColumnKey(col) === 'mobile')
 
           if (genderIndex !== -1 && phoneIndex !== -1) {
             reorderColumns?.(genderIndex, phoneIndex)
-            ElMessage.success('已交换性别和手机号列位置')
+            ElMessage.success('已交换昵称和手机号列位置')
           }
         }
         break

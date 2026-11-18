@@ -80,7 +80,9 @@
 
   // 计算属性：上传服务器地址
   const uploadServer = computed(
-    () => props.uploadConfig?.server || `${VITE_API_URL}/api/common/upload/wangeditor`
+    () =>
+      props.uploadConfig?.server ||
+      `${VITE_API_URL.replace(/\/$/, '')}/api/common/upload/wangeditor`
   )
 
   // 合并上传配置
@@ -122,7 +124,7 @@
         allowedFileTypes: mergedUploadConfig.value.allowedFileTypes,
         server: uploadServer.value,
         headers: {
-          Authorization: userStore.accessToken
+          Authorization: `Bearer ${userStore.accessToken}`
         },
         onSuccess() {
           ElMessage.success(`图片上传成功 ${EmojiText[200]}`)
@@ -137,7 +139,10 @@
 
   // 自定义上传
   if (props.uploadConfig?.isCustomUpload && props.uploadConfig?.server && editorConfig.MENU_CONF) {
-    editorConfig.MENU_CONF.uploadImage.customUpload = async (file: File, insertFn: InsertFnType) => {
+    editorConfig.MENU_CONF.uploadImage.customUpload = async (
+      file: File,
+      insertFn: InsertFnType
+    ) => {
       try {
         const formData = new FormData()
         formData.append(mergedUploadConfig.value.fieldName, file)
@@ -145,10 +150,7 @@
         const response = await request.post<{ url: string; alt: string; href: string }>({
           url: props.uploadConfig?.server,
           data: formData,
-          headers: {
-            'Content-Type':'multipart/form-data',
-            Authorization: userStore.accessToken
-          }
+          headers: { 'Content-Type': 'multipart/form-data' }
         })
 
         const { url, alt, href } = response

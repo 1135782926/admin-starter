@@ -7,7 +7,7 @@
  *
  * - 用户登录状态管理
  * - 用户信息存储
- * - 访问令牌和刷新令牌管理
+ * - 访问令牌管理
  * - 语言设置
  * - 搜索历史记录
  * - 锁屏状态和密码管理
@@ -42,6 +42,8 @@ import { setPageTitle } from '@/utils/router'
 import { resetRouterState } from '@/router/guards/beforeEach'
 import { useMenuStore } from './menu'
 import { StorageConfig } from '@/utils/storage/storage-config'
+import { fetchLogout } from '@/api/auth'
+import { isHttpError } from '@/utils/http/error'
 
 /**
  * 用户状态管理
@@ -64,8 +66,9 @@ export const useUserStore = defineStore(
     const searchHistory = ref<AppRouteRecord[]>([])
     // 访问令牌
     const accessToken = ref('')
-    // 刷新令牌
-    const refreshToken = ref('')
+    // 不持久化的会话版本，隔离退出与切换账号前的请求。
+    let sessionVersion = 0
+    const getSessionVersion = () => sessionVersion
 
     // 计算属性：获取用户信息
     const getUserInfo = computed(() => info.value)
@@ -123,15 +126,32 @@ export const useUserStore = defineStore(
       lockPassword.value = password
     }
 
-    /**
-     * 设置令牌
-     * @param newAccessToken 访问令牌
-     * @param newRefreshToken 刷新令牌（可选）
-     */
-    const setToken = (newAccessToken: string, newRefreshToken?: string) => {
+    const beginLogin = () => {
+      sessionVersion++
+      accessToken.value = ''
+      isLogin.value = false
+      info.value = {}
+      resetRouterState()
+      return sessionVersion
+    }
+
+    const setToken = (newAccessToken: string) => {
+      sessionVersion++
+      resetRouterState()
+      info.value = {}
       accessToken.value = newAccessToken
-      if (newRefreshToken) {
-        refreshToken.value = newRefreshToken
+    }
+
+    const logout = async () => {
+      const version = ++sessionVersion
+      try {
+        if (accessToken.value) await fetchLogout()
+      } catch (error) {
+        if (getSessionVersion() === version && !(isHttpError(error) && error.code === 401)) {
+          ElMessage.warning('已清除本地登录状态，服务端退出未确认，请勿继续使用原令牌')
+        }
+      } finally {
+        if (getSessionVersion() === version) logOut()
       }
     }
 
@@ -141,6 +161,7 @@ export const useUserStore = defineStore(
      * 如果是同一账号重新登录，保留工作台标签页
      */
     const logOut = () => {
+      sessionVersion++
       // 保存当前用户 ID，用于下次登录时判断是否为同一用户
       const currentUserId = info.value.userId
       if (currentUserId) {
@@ -157,18 +178,16 @@ export const useUserStore = defineStore(
       lockPassword.value = ''
       // 清空访问令牌
       accessToken.value = ''
-      // 清空刷新令牌
-      refreshToken.value = ''
       // 注意：不清空工作台标签页，等下次登录时根据用户判断
       // 移除iframe路由缓存
       sessionStorage.removeItem('iframeRoutes')
       // 清空主页路径
       useMenuStore().setHomePath('')
       // 重置路由状态
-      resetRouterState(500)
+      resetRouterState()
       // 跳转到登录页，携带当前路由作为 redirect 参数
       const currentRoute = router.currentRoute.value
-      const redirect = currentRoute.path !== '/login' ? currentRoute.fullPath : undefined
+      const redirect = currentRoute.name !== 'Login' ? currentRoute.fullPath : undefined
       router.push({
         name: 'Login',
         query: redirect ? { redirect } : undefined
@@ -211,7 +230,6 @@ export const useUserStore = defineStore(
       info,
       searchHistory,
       accessToken,
-      refreshToken,
       getUserInfo,
       getSettingState,
       getWorktabState,
@@ -222,6 +240,9 @@ export const useUserStore = defineStore(
       setLockStatus,
       setLockPassword,
       setToken,
+      beginLogin,
+      getSessionVersion,
+      logout,
       logOut,
       checkAndClearWorktabs
     }
@@ -229,7 +250,17 @@ export const useUserStore = defineStore(
   {
     persist: {
       key: 'user',
-      storage: localStorage
+      storage: localStorage,
+      pick: [
+        'language',
+        'isLogin',
+        'isLock',
+        'lockPassword',
+        'info',
+        'searchHistory',
+        'accessToken'
+      ],
+      afterHydrate: ({ store }) => store.$persist()
     }
   }
 )

@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Connect administrator login, current user, logout, and permitted menus to Laravel using a single Bearer token.
+- Default development and production to backend permissions, with a Laravel development proxy and same-origin production API.
+- Ignore responses from previous sessions, preserve authentication on 403, and show an empty state when no menus are accessible.
+- Replace administrator and role demo pages with real scoped CRUD, paginated administrator search, role assignment, and hierarchical role groups.
+- Edit menu and button allocations together, limit selections to the parent allocation, and keep reserved roles read-only; shrinking allocations and disabling branches are explained before saving.
+- Add a read-only administrator audit log page with server-side filters and pagination, permission-gated details, verified actor snapshots separate from unverified login names, masked field diffs, and related authorization changes.
+- Use `ArtSearchBar` and `ArtTable` for administrator audit log filters, rows, and server-side pagination.
+- Restart Vite after changing development API settings; rebuild production assets after environment changes. Production serves `/api` from the Laravel origin.
+
 ## [Released]
 
 ### v3.0.1 - 2025-11-15

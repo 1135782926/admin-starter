@@ -64,14 +64,14 @@
   component: '/examples/permission/page-visibility',
   meta: {
     title: 'menus.permission.pageVisibility',
-    roles: ['R_SUPER'], // 仅超级管理员可访问
+    roles: ['super-admin'], // 仅超级管理员可访问
     keepAlive: true
   }
 }</code></pre>
                 <p class="m-0 mb-2 leading-[1.6] text-g-700"><strong>权限验证流程：</strong></p>
                 <ul class="pl-5 my-2">
                   <li class="my-1 leading-[1.5] text-g-700"
-                    >用户登录后，接口返回用户角色信息（如 R_SUPER、R_ADMIN、R_USER）</li
+                    >用户登录后，接口返回真实角色名称（如 super-admin、admin、user）</li
                   >
                   <li class="my-1 leading-[1.5] text-g-700">
                     在
@@ -246,10 +246,10 @@
   // 获取角色显示名称
   const getRoleDisplayName = (role: string) => {
     const roleMap: Record<string, string> = {
-      R_SUPER: '超级管理员',
-      R_ADMIN: '管理员',
-      R_USER: '普通用户'
+      'super-admin': '超级管理员',
+      admin: '管理员',
+      user: '普通用户'
     }
-    return roleMap[role] || '未知角色'
+    return roleMap[role] || role
   }
 </script>

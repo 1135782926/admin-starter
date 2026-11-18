@@ -71,7 +71,6 @@ declare namespace Api {
     /** 登录响应 */
     interface LoginResponse {
       token: string
-      refreshToken: string
     }
 
     /** 用户信息 */
@@ -87,52 +86,155 @@ declare namespace Api {
 
   /** 系统管理类型 */
   namespace SystemManage {
-    /** 用户列表 */
-    type UserList = Api.Common.PaginatedResponse<UserListItem>
-
-    /** 用户列表项 */
-    interface UserListItem {
+    interface AdminRecord {
       id: number
-      avatar: string
-      status: string
-      userName: string
-      userGender: string
-      nickName: string
-      userPhone: string
-      userEmail: string
-      userRoles: string[]
-      createBy: string
-      createTime: string
-      updateBy: string
-      updateTime: string
+      username: string
+      nickname: string | null
+      email: string | null
+      mobile: string | null
+      status: boolean
+      role_ids: number[]
+      roles: { id: number; name: string; display_name: string }[]
+      created_at: string | null
+      updated_at: string | null
+      can_manage: boolean
     }
 
-    /** 用户搜索参数 */
-    type UserSearchParams = Partial<
-      Pick<UserListItem, 'id' | 'userName' | 'userGender' | 'userPhone' | 'userEmail' | 'status'> &
-        Api.Common.CommonSearchParams
-    >
-
-    /** 角色列表 */
-    type RoleList = Api.Common.PaginatedResponse<RoleListItem>
-
-    /** 角色列表项 */
-    interface RoleListItem {
-      roleId: number
-      roleName: string
-      roleCode: string
-      description: string
-      enabled: boolean
-      createTime: string
+    interface AdminSearchParams {
+      page?: number
+      per_page?: number
+      keyword?: string
+      status?: boolean
     }
 
-    /** 角色搜索参数 */
-    type RoleSearchParams = Partial<
-      Pick<RoleListItem, 'roleId' | 'roleName' | 'roleCode' | 'description' | 'enabled'> &
-        Api.Common.CommonSearchParams & {
-          startTime: string | null
-          endTime: string | null
-        }
+    type AdminList = Api.Common.PaginatedResponse<AdminRecord>
+
+    type AdminLogModule = 'auth' | 'admin' | 'role' | 'menu'
+    type AdminLogAction = 'login' | 'logout' | 'create' | 'update' | 'delete'
+    type AdminLogValue =
+      | string
+      | number
+      | boolean
+      | null
+      | AdminLogValue[]
+      | { [key: string]: AdminLogValue }
+    type AdminLogChanges = Record<
+      string,
+      { before: AdminLogValue; after: AdminLogValue } | { changed: true }
     >
+
+    interface AdminLogRecord {
+      id: number
+      actor_id: number | null
+      actor_username: string | null
+      actor_nickname: string | null
+      attempted_username: string | null
+      module: AdminLogModule
+      action: AdminLogAction
+      permission_name: string | null
+      route_name: string
+      method: string
+      path: string
+      target_type: 'admin' | 'role' | 'menu' | null
+      target_id: number | null
+      target_label: string | null
+      status_code: number
+      success: boolean
+      ip_address: string | null
+      user_agent: string | null
+      duration_ms: number
+      created_at: string
+      changes?: AdminLogChanges | null
+      related_changes?:
+        | {
+            type: 'role' | 'menu'
+            id: number
+            label: string
+            changes: AdminLogChanges
+          }[]
+        | null
+    }
+
+    interface AdminLogSearchParams {
+      page?: number
+      per_page?: number
+      keyword?: string
+      actor_id?: number
+      module?: AdminLogModule
+      action?: AdminLogAction
+      success?: boolean
+      status_code?: number
+      ip_address?: string
+      date_from?: string
+      date_to?: string
+    }
+
+    type AdminLogList = Api.Common.PaginatedResponse<AdminLogRecord>
+
+    interface AdminInput {
+      username: string
+      nickname: string
+      password?: string
+      email: string | null
+      mobile: string | null
+      status: boolean
+      role_ids: number[]
+    }
+
+    interface RoleOption {
+      id: number
+      name: string
+      display_name: string
+      parent_id: number | null
+      status: boolean
+      effective_status: boolean
+      can_assign: boolean
+    }
+
+    interface RoleRecord {
+      id: number
+      name: string
+      display_name: string
+      parent_id: number | null
+      status: boolean
+      effective_status: boolean
+      remark: string | null
+      permission_ids: number[]
+      permissions_count: number
+      admins_count: number
+      can_manage: boolean
+      created_at: string | null
+      updated_at: string | null
+      children?: RoleRecord[]
+    }
+
+    interface RoleSearchParams {
+      keyword?: string
+      status?: boolean
+    }
+
+    interface RoleInput {
+      name: string
+      display_name: string
+      parent_id: number | null
+      status: boolean
+      remark: string | null
+      permission_ids: number[]
+    }
+
+    interface MenuPermissionNode {
+      id: number
+      key: string
+      parent_id: number | null
+      type: 'directory' | 'menu' | 'button'
+      title: string
+      permission_id: number | null
+      permission_name: string | null
+      status: boolean
+      effective_status: boolean
+      depends_on: number[]
+      assignable: boolean
+      children: MenuPermissionNode[]
+    }
   }
 }

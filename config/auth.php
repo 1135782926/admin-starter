@@ -1,8 +1,11 @@
 <?php
 
+use App\Models\AdminUser;
 use App\Models\User;
 
 return [
+
+    'admin_token_days' => (int) env('ADMIN_TOKEN_DAYS', 7),
 
     /*
     |--------------------------------------------------------------------------
@@ -42,6 +45,10 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        'admin' => [
+            'driver' => 'sanctum',
+            'provider' => 'admins',
+        ],
     ],
 
     /*
@@ -62,6 +69,10 @@ return [
     */
 
     'providers' => [
+        'admins' => [
+            'driver' => 'eloquent',
+            'model' => AdminUser::class,
+        ],
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),

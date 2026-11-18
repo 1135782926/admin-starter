@@ -10,7 +10,8 @@
         <ArtHeaderBar />
       </div>
       <div id="app-content">
-        <ArtPageContent />
+        <ElEmpty v-if="route.name === 'NoAccessibleMenus'" description="暂无可访问菜单" />
+        <ArtPageContent v-else />
       </div>
     </main>
 
@@ -22,6 +23,7 @@
 
 <script setup lang="ts">
   defineOptions({ name: 'AppLayout' })
+  const route = useRoute()
 </script>
 
 <style lang="scss" scoped>

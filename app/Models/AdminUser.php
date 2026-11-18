@@ -20,6 +20,17 @@ class AdminUser extends Authenticatable
 
     protected string $guard_name = 'web';
 
+    protected $attributes = ['status' => true];
+
+    protected static function booted(): void
+    {
+        static::updated(function (AdminUser $admin): void {
+            if ($admin->wasChanged('status') && ! $admin->status) {
+                $admin->tokens()->delete();
+            }
+        });
+    }
+
     /**
      * @return array<string, string>
      */

@@ -115,9 +115,9 @@
         confirmButtonText: t('common.confirm'),
         cancelButtonText: t('common.cancel'),
         customClass: 'login-out-dialog'
-      }).then(() => {
-        userStore.logOut()
       })
+        .then(() => userStore.logout())
+        .catch(() => {})
     }, 200)
   }
 

@@ -400,7 +400,7 @@
   }
 
   const toLogin = () => {
-    userStore.logOut()
+    void userStore.logout()
   }
 
   const openLockScreen = () => {

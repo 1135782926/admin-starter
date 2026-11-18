@@ -7,10 +7,9 @@ import request from '@/utils/http'
  */
 export function fetchLogin(params: Api.Auth.LoginParams) {
   return request.post<Api.Auth.LoginResponse>({
-    url: '/api/auth/login',
-    params
-    // showSuccessMessage: true // 显示成功消息
-    // showErrorMessage: false // 不显示错误消息
+    url: '/api/v1/admin/auth/login',
+    data: params,
+    skipAuth: true
   })
 }
 
@@ -20,10 +19,13 @@ export function fetchLogin(params: Api.Auth.LoginParams) {
  */
 export function fetchGetUserInfo() {
   return request.get<Api.Auth.UserInfo>({
-    url: '/api/user/info'
-    // 自定义请求头
-    // headers: {
-    //   'X-Custom-Header': 'your-custom-value'
-    // }
+    url: '/api/v1/admin/me'
+  })
+}
+
+export function fetchLogout() {
+  return request.post<null>({
+    url: '/api/v1/admin/auth/logout',
+    showErrorMessage: false
   })
 }
