@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 
-for tool in lerd curl openssl; do
+for tool in lerd podman curl openssl; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         printf '缺少 %s，请安装后重试。\n' "$tool" >&2
         exit 1
@@ -44,8 +44,10 @@ if [[ ! "$label" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
     exit 1
 fi
 if [[ -n "$previous" && "$label" != "$previous" ]]; then
-    printf '这个目录已初始化为 %s.%s，请使用原域名重新运行。\n' "$previous" "$tld" >&2
-    exit 1
+    if lerd domain list >/dev/null 2>&1 || (cd web && lerd domain list >/dev/null 2>&1); then
+        printf '这个项目仍注册在 lerd，请先解除旧站点注册，再更换主域名。\n' >&2
+        exit 1
+    fi
 fi
 
 main_host=$label.$tld
@@ -102,12 +104,20 @@ done
 (
     cd web
     # Podman builds cannot reach a proxy listening on the host's loopback.
+    loopback_proxies=()
     for variable in HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy; do
         proxy=${!variable-}
         if [[ "${proxy#*://}" =~ ^(localhost|127\.[0-9.]+|\[::1\])([:/]|$) ]]; then
-            unset "$variable"
+            loopback_proxies+=("$variable")
         fi
     done
+    if [[ ${#loopback_proxies[@]} -gt 0 ]]; then
+        base_image=$(awk '$1 == "FROM" { print $2; exit }' Containerfile.lerd)
+        if ! podman image exists "$base_image"; then
+            podman pull "$base_image"
+        fi
+        unset "${loopback_proxies[@]}"
+    fi
     lerd link
     if ! lerd group list | awk -v main="$main_host" -v web="$web_host" '
         /^[^[:space:]]/ { in_group = ($NF == "(" main ")") }
