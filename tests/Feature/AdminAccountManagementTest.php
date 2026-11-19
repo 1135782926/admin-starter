@@ -4,6 +4,7 @@ use App\Models\AdminPermission;
 use App\Models\AdminRole;
 use App\Models\AdminUser;
 use App\Models\User;
+use App\Notifications\AdminPasswordChanged;
 use Database\Seeders\AdminManagementMenuSeeder;
 use Database\Seeders\AdminMenuSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -72,9 +73,12 @@ test('creates lists reads updates and deletes administrator accounts with real r
     expect($target->fresh()->nickname)->toBe('Updated operator');
     expect($target->fresh()->email)->toBeNull();
     expect($target->roles()->pluck('id')->all())->toBe([$second->id]);
+    $target->notify(new AdminPasswordChanged);
+    $notification = $target->notifications()->sole();
     $this->deleteJson('/api/v1/admin/admins/'.$target->id, ['confirmed' => true])->assertOk();
     $this->assertModelMissing($target);
     $this->assertDatabaseMissing('admin_model_has_roles', ['model_id' => $target->id, 'model_type' => $target->getMorphClass()]);
+    $this->assertModelMissing($notification);
 });
 
 test('stores administrator avatars on create and replace and returns the saved image in list and detail', function (): void {

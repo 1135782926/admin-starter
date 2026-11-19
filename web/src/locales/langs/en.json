@@ -112,9 +112,13 @@
   "notice": {
     "title": "Notice",
     "btnRead": "Mark as read",
-    "bar": ["Notice", "Message", "Todo"],
-    "text": ["No"],
-    "viewAll": "View all"
+    "readAll": "Mark all as read",
+    "readItem": "Mark {title} as read",
+    "bellLabel": "Notifications ({count} unread)",
+    "empty": "No notifications",
+    "loading": "Loading notifications…",
+    "loadFailed": "Could not load notifications",
+    "retry": "Retry"
   },
   "worktab": {
     "btn": {

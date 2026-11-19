@@ -4,6 +4,7 @@
  */
 import { WEB_LINKS } from '@/utils/constants'
 import type { FastEnterConfig } from '@/types/config'
+import { dashboardConsoleRoute } from '@/router/modules/dashboard'
 
 const fastEnterConfig: FastEnterConfig = {
   // 显示条件（屏幕宽度）
@@ -17,7 +18,7 @@ const fastEnterConfig: FastEnterConfig = {
       iconColor: '#377dff',
       enabled: true,
       order: 1,
-      routeName: 'Console'
+      routeName: dashboardConsoleRoute.name
     },
     {
       name: '分析页',

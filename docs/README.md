@@ -99,6 +99,16 @@ The Art Design Pro frontend is in `web/`. Copy `web/.env.example` to `web/.env`,
 
 Use backend permission mode (`VITE_ACCESS_MODE=backend`). Development requests go through the Vite `/api` proxy; set `VITE_API_PROXY_URL` to your Laravel service. Production uses same-origin `/api` URLs, so serve/proxy that prefix to Laravel. Restart Vite after environment changes and rebuild for production. Start Laravel with `php artisan serve`, then run `pnpm dev` in `web/`. Log in with an explicitly provisioned administrator. An enabled account with no menu permissions remains logged in and sees “暂无可访问菜单”. Administrator, hierarchical role group, and menu management pages are connected to their real APIs. The menu page maintains directories, pages, and button permissions through `/api/v1/admin/menus`, while navigation still uses `/api/v1/admin/me/menus`.
 
+The built-in Operations Overview at `/dashboard/console` is the default landing page for administrators with accessible menus. Its sample statistics support 7- and 30-day periods. A backend menu entry configured at that path takes precedence.
+
+### Administrator notifications
+
+Run `php artisan migrate --no-interaction` to create the inbox. Administrators can browse and mark their own notifications as read. Signing in to an account that already has a valid login session adds a new sign-in alert. A successful password change revokes existing sessions and leaves an inbox entry for the next sign-in.
+
+For live updates, generate local `REVERB_APP_ID`, `REVERB_APP_KEY`, and `REVERB_APP_SECRET` values, set `BROADCAST_CONNECTION=reverb`, and configure the host, port and allowed frontend origins as shown in `.env.example`. Set the matching public key and browser endpoint in `web/.env`, then restart Vite. Start `php artisan reverb:start --no-interaction` and `php artisan queue:work --no-interaction` alongside the API and admin frontend. A single instance can use the existing database queue. Without a WebSocket connection, the bell fetches the latest inbox each time it opens.
+
+In production, run Reverb and the queue worker under a process manager. Serve the browser endpoint over WSS and allow the admin frontend hostname in `REVERB_ALLOWED_ORIGINS`. Keep the app secret on the Laravel server. The browser authorizes its own private channel through `POST /api/v1/admin/broadcasting/auth` with its existing administrator token.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

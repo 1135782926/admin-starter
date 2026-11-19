@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateAdminPasswordRequest;
 use App\Http\Requests\UpdateAdminProfileRequest;
 use App\Http\Resources\AdminProfileResource;
 use App\Http\Responses\ApiResponse;
+use App\Notifications\AdminPasswordChanged;
 use App\Services\AdminLogRecorder;
 use App\Services\AdminUserService;
 use Illuminate\Http\JsonResponse;
@@ -42,6 +43,7 @@ class AdminProfileController extends Controller
 
             $admin->update(['password' => Hash::make($request->validated('password'))]);
             $admin->tokens()->delete();
+            $admin->notify(new AdminPasswordChanged);
 
             return ApiResponse::success();
         });

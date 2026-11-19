@@ -50,6 +50,25 @@
           @pagination:current-change="changePage"
           @pagination:size-change="changeSize"
         >
+          <template #preview="{ row }">
+            <button
+              v-if="row.is_image"
+              type="button"
+              class="flex size-12 cursor-pointer items-center justify-center overflow-hidden rounded border border-g-300 bg-g-100 dark:border-g-700"
+              :title="`预览 ${row.title}`"
+              @click="openPreview(row)"
+            >
+              <img
+                v-if="previewUrls[row.id]"
+                :src="previewUrls[row.id]"
+                :alt="row.title"
+                loading="lazy"
+                class="size-full object-cover"
+              />
+              <ElIcon v-else class="text-xl text-g-500"><Picture /></ElIcon>
+            </button>
+            <span v-else class="text-g-500">—</span>
+          </template>
           <template #title="{ row }">
             <div class="flex min-w-0 items-center gap-2">
               <ElIcon class="shrink-0 text-lg text-primary">
@@ -181,6 +200,7 @@
   const searchForm = ref<SearchForm>({})
   const appliedSearch = ref<Api.Attachment.SearchParams>({})
   const records = ref<AttachmentRecord[]>([])
+  const previewUrls = ref<Record<number, string>>({})
   const selected = ref<AttachmentRecord[]>([])
   const pagination = reactive({ current: 1, size: 20, total: 0 })
   const paginationOptions = {
@@ -282,6 +302,7 @@
   ]
   const columns: ColumnOption<AttachmentRecord>[] = [
     { type: 'selection', width: 48 },
+    { prop: 'preview', label: '图片', width: 76, align: 'center', useSlot: true },
     { prop: 'title', label: '名称', minWidth: 240, useSlot: true },
     { prop: 'category', label: '分类', minWidth: 120, useSlot: true },
     {
@@ -317,6 +338,12 @@
       })
       if (id !== requestId) return
       records.value = data.records
+      const publicPreviewUrls: Record<number, string> = {}
+      for (const row of data.records) {
+        if (row.is_image && row.url) publicPreviewUrls[row.id] = row.url
+      }
+      previewUrls.value = publicPreviewUrls
+      void loadPrivatePreviewUrls(data.records, id)
       pagination.total = data.total
       pagination.current = data.current
       pagination.size = data.size
@@ -328,6 +355,24 @@
     } finally {
       if (id === requestId) loading.value = false
     }
+  }
+
+  async function loadPrivatePreviewUrls(rows: AttachmentRecord[], loadId: number) {
+    const loadedUrls: Record<number, string> = {}
+    await Promise.all(
+      rows
+        .filter((row) => row.is_image && !row.url)
+        .map(async (row) => {
+          try {
+            const data = await fetchGetAttachmentTemporaryUrl(row.id, 'inline')
+            loadedUrls[row.id] = data.url
+          } catch {
+            // 保留占位图标，点击预览时会重新获取图片地址。
+          }
+        })
+    )
+    if (loadId !== requestId) return
+    previewUrls.value = { ...previewUrls.value, ...loadedUrls }
   }
 
   function search() {

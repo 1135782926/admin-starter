@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Common\WangEditorUploadController;
 use App\Http\Controllers\Api\V1\Admin\AdminLogController;
+use App\Http\Controllers\Api\V1\Admin\AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\AdminProfileController;
 use App\Http\Controllers\Api\V1\Admin\AdminUserController;
 use App\Http\Controllers\Api\V1\Admin\AttachmentController;
@@ -29,6 +30,11 @@ Route::prefix('v1/admin')->name('admin.')->group(function (): void {
         Route::patch('me/password', [AdminProfileController::class, 'changePassword'])
             ->middleware('throttle:admin-password')->name('me.password.update');
         Route::get('me/logs', [AdminLogController::class, 'personal'])->name('me.logs');
+        Route::get('me/notifications', [AdminNotificationController::class, 'index'])->name('me.notifications.index');
+        Route::patch('me/notifications/read-all', [AdminNotificationController::class, 'markAllRead'])->name('me.notifications.read-all');
+        Route::patch('me/notifications/{notification}/read', [AdminNotificationController::class, 'markRead'])
+            ->whereUuid('notification')->name('me.notifications.read');
+        Route::post('broadcasting/auth', [AdminNotificationController::class, 'authorizeChannel'])->name('broadcasting.auth');
 
         Route::get('logs', [AdminLogController::class, 'index'])->middleware('admin.permission:system.log.view')->name('logs.index');
         Route::get('logs/{log}', [AdminLogController::class, 'show'])->middleware('admin.permission:system.log.view')->name('logs.show');

@@ -150,6 +150,7 @@ class AdminUserService
             $admin = $this->managedAdmin($actor, $admin);
             $this->protectLastSuper($admin, false, [], $admins);
             $admin->tokens()->delete();
+            $admin->notifications()->delete();
             $admin->syncRoles([]);
             $admin->syncPermissions([]);
             $admin->delete();

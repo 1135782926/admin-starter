@@ -114,9 +114,21 @@
           v-if="shouldShowNotification"
           icon="ri:notification-2-line"
           class="notice-button relative"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('notice.bellLabel', { count: unreadCount })"
+          :aria-expanded="showNotice"
+          :aria-controls="showNotice ? 'admin-notifications' : undefined"
           @click="visibleNotice"
+          @keydown.enter.prevent="visibleNotice"
+          @keydown.space.prevent="visibleNotice"
+          @keydown.esc="showNotice = false"
         >
-          <div class="absolute top-2 right-2 size-1.5 !bg-danger rounded-full"></div>
+          <div
+            v-if="unreadCount"
+            class="absolute top-2 right-2 size-1.5 rounded-full !bg-danger"
+            aria-hidden="true"
+          ></div>
         </ArtIconButton>
 
         <!-- 聊天按钮 -->
@@ -131,7 +143,12 @@
 
         <!-- 设置按钮 -->
         <div v-if="shouldShowSettings">
-          <ElPopover :visible="showSettingGuide" placement="bottom-start" :width="190" :offset="0">
+          <ElPopover
+            :visible="showSettingGuide && !(showNotice && shouldShowNotification)"
+            placement="bottom-start"
+            :width="190"
+            :offset="0"
+          >
             <template #reference>
               <div class="flex-cc">
                 <ArtIconButton icon="ri:settings-line" class="setting-btn" @click="openSetting" />
@@ -164,7 +181,21 @@
     <ArtWorkTab />
 
     <!-- 通知 -->
-    <ArtNotification v-model:value="showNotice" ref="notice" />
+    <ArtNotification
+      v-if="showNotice && shouldShowNotification"
+      :records="notifications"
+      :unread-count="unreadCount"
+      :current-page="currentPage"
+      :page-size="pageSize"
+      :total="total"
+      :loading="loading"
+      :load-failed="loadFailed"
+      :marking-read="markingRead"
+      @change-page="loadPage"
+      @read="markRead"
+      @read-all="markRead()"
+      @keydown.esc="showNotice = false"
+    />
   </div>
 </template>
 
@@ -181,6 +212,7 @@
   import { mittBus } from '@/utils/sys'
   import { themeAnimation } from '@/utils/ui/animation'
   import { useCommon } from '@/hooks/core/useCommon'
+  import { useAdminNotifications } from '@/hooks/core/useAdminNotifications'
   import { useHeaderBar } from '@/hooks/core/useHeaderBar'
   import ArtUserMenu from './widget/ArtUserMenu.vue'
 
@@ -220,7 +252,18 @@
   const { menuList } = storeToRefs(menuStore)
 
   const showNotice = ref(false)
-  const notice = ref(null)
+  const {
+    notifications,
+    unreadCount,
+    currentPage,
+    pageSize,
+    total,
+    loading,
+    loadFailed,
+    markingRead,
+    loadPage,
+    markRead
+  } = useAdminNotifications(shouldShowNotification)
 
   // 菜单类型判断
   const isLeftMenu = computed(() => menuType.value === MenuTypeEnum.LEFT)
@@ -333,6 +376,7 @@
    */
   const visibleNotice = (): void => {
     showNotice.value = !showNotice.value
+    if (showNotice.value) void loadPage(1)
   }
 
   /**

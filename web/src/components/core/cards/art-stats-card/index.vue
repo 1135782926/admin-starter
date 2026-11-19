@@ -8,9 +8,11 @@
       <ArtSvgIcon :icon="icon"></ArtSvgIcon>
     </div>
     <div class="flex-1">
-      <p class="m-0 text-lg font-medium" :style="{ color: textColor }" v-if="title">
-        {{ title }}
-      </p>
+      <slot name="title">
+        <p class="m-0 text-lg font-medium" :style="{ color: textColor }" v-if="title">
+          {{ title }}
+        </p>
+      </slot>
       <ArtCountTo
         class="m-0 text-2xl font-medium"
         v-if="count !== undefined"
@@ -19,12 +21,15 @@
         :decimals="decimals"
         :separator="separator"
       />
-      <p
-        class="mt-1 text-sm text-g-500 opacity-90"
-        :style="{ color: textColor }"
-        v-if="description"
-        >{{ description }}</p
-      >
+      <slot name="description">
+        <p
+          v-if="description"
+          class="mt-1 text-sm text-g-500 opacity-90"
+          :style="{ color: textColor }"
+        >
+          {{ description }}
+        </p>
+      </slot>
     </div>
     <div v-if="showArrow">
       <ArtSvgIcon icon="ri:arrow-right-s-line" class="text-xl text-g-500" />
@@ -51,7 +56,7 @@
     /** 分隔符 */
     separator?: string
     /** 描述 */
-    description: string
+    description?: string
     /** 文本颜色 */
     textColor?: string
     /** 是否显示箭头 */

@@ -7,6 +7,7 @@ use App\Http\Requests\AdminLoginRequest;
 use App\Http\Resources\AdminUserResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\AdminUser;
+use App\Notifications\AdminSessionStarted;
 use App\Services\AdminLogRecorder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,8 +31,12 @@ class AuthController extends Controller
                 $admin->update(['password' => Hash::make($password)]);
             }
 
+            $hasActiveSession = $admin->tokens()->where('name', 'admin')->where('expires_at', '>', now())->exists();
             $token = $admin->createToken('admin', ['*'], now()->addDays((int) config('auth.admin_token_days', 7)));
             app(AdminLogRecorder::class)->loginSucceeded($request, $admin);
+            if ($hasActiveSession) {
+                $admin->notify(new AdminSessionStarted);
+            }
 
             return $token->plainTextToken;
         });

@@ -11,9 +11,11 @@ import type { AppRouteRecord } from '@/types/router'
 import { useUserStore } from '@/store/modules/user'
 import { useAppMode } from '@/hooks/core/useAppMode'
 import { fetchGetMenuList } from '@/api/system-manage'
+import { dashboardConsoleRoute, dashboardRoutes } from '../modules/dashboard'
 import { asyncRoutes } from '../routes/asyncRoutes'
 import { RoutesAlias } from '../routesAlias'
 import { formatMenuTitle } from '@/utils'
+import { RoutePermissionValidator } from './RoutePermissionValidator'
 
 export class MenuProcessor {
   /**
@@ -22,16 +24,13 @@ export class MenuProcessor {
   async getMenuList(): Promise<AppRouteRecord[]> {
     const { isFrontendMode } = useAppMode()
 
-    let menuList: AppRouteRecord[]
     if (isFrontendMode.value) {
-      menuList = await this.processFrontendMenu()
+      const menuList = await this.processFrontendMenu()
       this.validateMenuPaths(menuList)
-    } else {
-      menuList = await this.processBackendMenu()
+      return this.normalizeMenuPaths(menuList)
     }
 
-    // 规范化路径（将相对路径转换为完整路径）
-    return this.normalizeMenuPaths(menuList)
+    return this.processBackendMenu()
   }
 
   /**
@@ -55,8 +54,17 @@ export class MenuProcessor {
    * 处理后端控制模式的菜单
    */
   private async processBackendMenu(): Promise<AppRouteRecord[]> {
-    const list = await fetchGetMenuList()
-    return this.filterEmptyMenus(list)
+    const menuList = this.normalizeMenuPaths(this.filterEmptyMenus(await fetchGetMenuList()))
+    const [consoleMenu] = this.normalizeMenuPaths([dashboardConsoleRoute], dashboardRoutes.path)
+
+    if (
+      !menuList.length ||
+      RoutePermissionValidator.buildMenuPathSet(menuList).has(consoleMenu.path)
+    ) {
+      return menuList
+    }
+
+    return [consoleMenu, ...menuList]
   }
 
   /**

@@ -32,6 +32,7 @@ test('signs in with the trimmed administrator name and stores only a seven day t
     expect($token->token)->toBe(hash('sha256', explode('|', $plainText, 2)[1]));
     expect($token->expires_at->equalTo(now()->addDays(7)))->toBeTrue();
     expect($admin->fresh()->getRoleNames()->all())->toBe([]);
+    expect($admin->notifications()->exists())->toBeFalse();
 });
 
 test('returns a uniform 401 without issuing tokens for invalid administrator credentials', function (string $case): void {
@@ -142,7 +143,7 @@ test('returns the real administrator profile and an empty permission set without
 
 test('does not extend a login token when it is used and returns 401 after seven days', function (): void {
     $this->freezeTime();
-    AdminUser::factory()->create(['username' => 'expires', 'password' => 'password']);
+    $admin = AdminUser::factory()->create(['username' => 'expires', 'password' => 'password']);
     $plainText = $this->postJson('/api/v1/admin/auth/login', ['userName' => 'expires', 'password' => 'password'])
         ->assertOk()->json('data.token');
     $token = PersonalAccessToken::findToken($plainText);
@@ -155,6 +156,8 @@ test('does not extend a login token when it is used and returns 401 after seven 
     $this->app['auth']->forgetGuards();
     $this->withToken($plainText)->getJson('/api/v1/admin/me')->assertUnauthorized();
     $this->withToken($plainText)->postJson('/api/v1/admin/auth/logout')->assertUnauthorized();
+    $this->postJson('/api/v1/admin/auth/login', ['userName' => 'expires', 'password' => 'password'])->assertOk();
+    expect($admin->notifications()->exists())->toBeFalse();
 });
 
 test('allows independent logins and logout revokes only the current bearer token', function (): void {
@@ -163,6 +166,9 @@ test('allows independent logins and logout revokes only the current bearer token
     $second = $this->postJson('/api/v1/admin/auth/login', ['userName' => 'terminals', 'password' => 'password'])->assertOk()->json('data.token');
     expect($first)->not->toBe($second);
     expect($admin->tokens()->count())->toBe(2);
+    $this->withToken($first)->getJson('/api/v1/admin/me/notifications')->assertOk()
+        ->assertJsonPath('data.unread_count', 1)
+        ->assertJsonPath('data.records.0.type', 'admin.session-started');
 
     $this->withToken($first)->postJson('/api/v1/admin/auth/logout')
         ->assertOk()->assertExactJson(['code' => 200, 'msg' => '操作成功', 'data' => null]);

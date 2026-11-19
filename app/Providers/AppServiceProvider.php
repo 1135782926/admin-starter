@@ -23,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        require base_path('routes/channels.php');
+
         RateLimiter::for('admin-login', fn (Request $request): array => [
             Limit::perMinute(5)->by('account:'.hash('sha256', mb_strtolower(trim(is_string($request->input('userName')) ? $request->input('userName') : '')).'|'.$request->ip())),
             Limit::perMinute(60)->by('ip:'.$request->ip()),

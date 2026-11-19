@@ -206,7 +206,11 @@ test('changes the password, revokes both of the account tokens and logs only the
     $this->withToken($otherDevice)->getJson('/api/v1/admin/me')->assertUnauthorized();
     $this->withToken($otherAccount)->getJson('/api/v1/admin/me')->assertOk();
     $this->postJson('/api/v1/admin/auth/login', ['userName' => 'rotating', 'password' => ' old password '])->assertUnauthorized();
-    $this->postJson('/api/v1/admin/auth/login', ['userName' => 'rotating', 'password' => ' new password '])->assertOk()->assertJsonStructure(['data' => ['token']]);
+    $login = $this->postJson('/api/v1/admin/auth/login', ['userName' => 'rotating', 'password' => ' new password '])
+        ->assertOk()->assertJsonStructure(['data' => ['token']]);
+    $this->withToken($login->json('data.token'))->getJson('/api/v1/admin/me/notifications')->assertOk()
+        ->assertJsonPath('data.unread_count', 1)
+        ->assertJsonPath('data.records.0.type', 'admin.password-changed');
 });
 
 test('returns 422 without changing the password or revoking a session when validation fails', function (string $current, string $new, string $confirmation, string $field, string $message): void {
@@ -265,6 +269,7 @@ test('preserves the password and tokens if the password change audit cannot be s
     }
 
     expect($admin->fresh()->password)->toBe($admin->password);
+    expect($admin->notifications()->exists())->toBeFalse();
     expect(AdminLog::sole()->changes)->toBeNull();
     $this->getJson('/api/v1/admin/me')->assertOk();
 });

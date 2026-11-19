@@ -112,9 +112,13 @@
   "notice": {
     "title": "通知",
     "btnRead": "标为已读",
-    "bar": ["通知", "消息", "代办"],
-    "text": ["暂无"],
-    "viewAll": "查看全部"
+    "readAll": "全部已读",
+    "readItem": "将「{title}」标为已读",
+    "bellLabel": "通知（{count} 条未读）",
+    "empty": "暂无通知",
+    "loading": "正在加载通知…",
+    "loadFailed": "通知加载失败",
+    "retry": "重试"
   },
   "worktab": {
     "btn": {

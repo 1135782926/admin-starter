@@ -1,456 +1,124 @@
-<!-- 通知组件 -->
 <template>
-  <div
-    class="art-notification-panel art-card-sm !shadow-xl"
-    :style="{
-      transform: show ? 'scaleY(1)' : 'scaleY(0.9)',
-      opacity: show ? 1 : 0
-    }"
-    v-show="visible"
+  <section
+    id="admin-notifications"
+    class="art-notification-panel art-card-sm absolute top-14.5 right-5 z-10 flex max-h-[min(32rem,calc(100dvh-5rem))] w-96 flex-col overflow-hidden !shadow-xl max-sm:right-2 max-sm:left-2 max-sm:w-auto"
+    aria-labelledby="admin-notifications-title"
+    :aria-busy="loading"
     @click.stop
   >
-    <div class="flex-cb px-3.5 mt-3.5">
-      <span class="text-base font-medium text-g-800">{{ $t('notice.title') }}</span>
-      <span class="text-xs text-g-800 px-1.5 py-1 c-p select-none rounded hover:bg-g-200">
-        {{ $t('notice.btnRead') }}
-      </span>
+    <header class="flex items-center justify-between gap-3 border-b-d px-4 py-3">
+      <div class="flex items-center gap-2">
+        <h2 id="admin-notifications-title" class="text-base font-semibold text-g-900">
+          {{ $t('notice.title') }}
+        </h2>
+        <span v-if="unreadCount" class="rounded-full bg-theme/10 px-2 py-0.5 text-xs text-theme">
+          {{ unreadCount }}
+        </span>
+      </div>
+      <ElButton
+        text
+        type="primary"
+        :disabled="!unreadCount || markingRead"
+        @click="emit('readAll')"
+      >
+        {{ $t('notice.readAll') }}
+      </ElButton>
+    </header>
+
+    <div v-if="loadFailed" class="flex flex-col items-center gap-2 px-4 py-10 text-sm text-g-700">
+      <p>{{ $t('notice.loadFailed') }}</p>
+      <ElButton text type="primary" @click="emit('changePage', currentPage)">
+        {{ $t('notice.retry') }}
+      </ElButton>
+    </div>
+    <p v-else-if="loading && !records.length" class="px-4 py-10 text-center text-sm text-g-700">
+      {{ $t('notice.loading') }}
+    </p>
+    <div v-else-if="!records.length" class="flex flex-col items-center gap-2 px-4 py-10 text-g-700">
+      <ArtSvgIcon icon="ri:inbox-archive-line" class="text-3xl text-g-600" />
+      <p class="text-sm">{{ $t('notice.empty') }}</p>
     </div>
 
-    <ul class="box-border flex items-end w-full h-12.5 px-3.5 border-b-d">
+    <ul v-else class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <li
-        v-for="(item, index) in barList"
-        :key="index"
-        class="h-12 leading-12 mr-5 overflow-hidden text-[13px] text-g-700 c-p select-none"
-        :class="{ 'bar-active': barActiveIndex === index }"
-        @click="changeBar(index)"
+        v-for="item in records"
+        :key="item.id"
+        class="flex items-start gap-3 border-b-d px-4 py-3 last:border-b-0"
       >
-        {{ item.name }} ({{ item.num }})
+        <div
+          class="flex size-8 shrink-0 items-center justify-center rounded-lg text-base"
+          :class="item.read_at ? 'bg-g-200 text-g-700' : 'bg-theme/10 text-theme'"
+          aria-hidden="true"
+        >
+          <ArtSvgIcon
+            :icon="
+              item.type === 'admin.password-changed'
+                ? 'ri:shield-keyhole-line'
+                : 'ri:notification-3-line'
+            "
+          />
+        </div>
+        <div class="min-w-0 flex-1">
+          <h3 class="text-sm font-medium break-words text-g-900">{{ item.title }}</h3>
+          <p class="mt-1 text-xs leading-5 break-words text-g-700">{{ item.message }}</p>
+          <time :datetime="item.created_at" class="mt-1 block text-xs text-g-600">
+            {{ dateFormatter.format(new Date(item.created_at)) }}
+          </time>
+        </div>
+        <ElButton
+          v-if="!item.read_at"
+          text
+          size="small"
+          type="primary"
+          :disabled="markingRead"
+          :aria-label="$t('notice.readItem', { title: item.title })"
+          @click="emit('read', item.id)"
+        >
+          {{ $t('notice.btnRead') }}
+        </ElButton>
       </li>
     </ul>
 
-    <div class="w-full h-[calc(100%-95px)]">
-      <div class="h-[calc(100%-60px)] overflow-y-scroll scrollbar-thin">
-        <!-- 通知 -->
-        <ul v-show="barActiveIndex === 0">
-          <li
-            v-for="(item, index) in noticeList"
-            :key="index"
-            class="box-border flex-c px-3.5 py-3.5 c-p last:border-b-0 hover:bg-g-200/60"
-          >
-            <div
-              class="size-9 leading-9 text-center rounded-lg flex-cc"
-              :class="[getNoticeStyle(item.type).iconClass]"
-            >
-              <ArtSvgIcon class="text-lg !bg-transparent" :icon="getNoticeStyle(item.type).icon" />
-            </div>
-            <div class="w-[calc(100%-45px)] ml-3.5">
-              <h4 class="text-sm font-normal leading-5.5 text-g-900">{{ item.title }}</h4>
-              <p class="mt-1.5 text-xs text-g-500">{{ item.time }}</p>
-            </div>
-          </li>
-        </ul>
-
-        <!-- 消息 -->
-        <ul v-show="barActiveIndex === 1">
-          <li
-            v-for="(item, index) in msgList"
-            :key="index"
-            class="box-border flex-c px-3.5 py-3.5 c-p last:border-b-0 hover:bg-g-200/60"
-          >
-            <div class="w-9 h-9">
-              <img :src="item.avatar" class="w-full h-full rounded-lg" />
-            </div>
-            <div class="w-[calc(100%-45px)] ml-3.5">
-              <h4 class="text-xs font-normal leading-5.5">{{ item.title }}</h4>
-              <p class="mt-1.5 text-xs text-g-500">{{ item.time }}</p>
-            </div>
-          </li>
-        </ul>
-
-        <!-- 待办 -->
-        <ul v-show="barActiveIndex === 2">
-          <li
-            v-for="(item, index) in pendingList"
-            :key="index"
-            class="box-border px-5 py-3.5 last:border-b-0"
-          >
-            <h4>{{ item.title }}</h4>
-            <p class="text-xs text-g-500">{{ item.time }}</p>
-          </li>
-        </ul>
-
-        <!-- 空状态 -->
-        <div
-          v-show="currentTabIsEmpty"
-          class="relative top-25 h-full text-g-500 text-center !bg-transparent"
-        >
-          <ArtSvgIcon icon="system-uicons:inbox" class="text-5xl" />
-          <p class="mt-3.5 text-xs !bg-transparent"
-            >{{ $t('notice.text[0]') }}{{ barList[barActiveIndex].name }}</p
-          >
-        </div>
-      </div>
-
-      <div class="relative box-border w-full px-3.5">
-        <ElButton class="w-full mt-3" @click="handleViewAll" v-ripple>
-          {{ $t('notice.viewAll') }}
-        </ElButton>
-      </div>
-    </div>
-
-    <div class="h-25"></div>
-  </div>
+    <footer v-if="!loadFailed && total > pageSize" class="flex justify-center border-t-d p-2">
+      <ElPagination
+        small
+        layout="prev, pager, next"
+        :current-page="currentPage"
+        :page-size="pageSize"
+        :pager-count="5"
+        :total="total"
+        :disabled="loading || markingRead"
+        @update:current-page="emit('changePage', $event)"
+      />
+    </footer>
+  </section>
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch, type Ref, type ComputedRef } from 'vue'
   import { useI18n } from 'vue-i18n'
-
-  // 导入头像图片
-  import avatar1 from '@/assets/images/avatar/avatar1.webp'
-  import avatar2 from '@/assets/images/avatar/avatar2.webp'
-  import avatar3 from '@/assets/images/avatar/avatar3.webp'
-  import avatar4 from '@/assets/images/avatar/avatar4.webp'
-  import avatar5 from '@/assets/images/avatar/avatar5.webp'
-  import avatar6 from '@/assets/images/avatar/avatar6.webp'
+  import type { AdminNotification } from '@/api/admin-notification'
 
   defineOptions({ name: 'ArtNotification' })
 
-  interface NoticeItem {
-    /** 标题 */
-    title: string
-    /** 时间 */
-    time: string
-    /** 类型 */
-    type: NoticeType
-  }
-
-  interface MessageItem {
-    /** 标题 */
-    title: string
-    /** 时间 */
-    time: string
-    /** 头像 */
-    avatar: string
-  }
-
-  interface PendingItem {
-    /** 标题 */
-    title: string
-    /** 时间 */
-    time: string
-  }
-
-  interface BarItem {
-    /** 名称 */
-    name: ComputedRef<string>
-    /** 数量 */
-    num: number
-  }
-
-  interface NoticeStyle {
-    /** 图标 */
-    icon: string
-    /** icon 样式 */
-    iconClass: string
-  }
-
-  type NoticeType = 'email' | 'message' | 'collection' | 'user' | 'notice'
-
-  const { t } = useI18n()
-
-  const props = defineProps<{
-    value: boolean
+  defineProps<{
+    records: AdminNotification[]
+    unreadCount: number
+    currentPage: number
+    pageSize: number
+    total: number
+    loading: boolean
+    loadFailed: boolean
+    markingRead: boolean
   }>()
 
   const emit = defineEmits<{
-    'update:value': [value: boolean]
+    changePage: [page: number]
+    read: [id: string]
+    readAll: []
   }>()
 
-  const show = ref(false)
-  const visible = ref(false)
-  const barActiveIndex = ref(0)
-
-  const useNotificationData = () => {
-    // 通知数据
-    const noticeList = ref<NoticeItem[]>([
-      {
-        title: '新增国际化',
-        time: '2024-6-13 0:10',
-        type: 'notice'
-      },
-      {
-        title: '冷月呆呆给你发了一条消息',
-        time: '2024-4-21 8:05',
-        type: 'message'
-      },
-      {
-        title: '小肥猪关注了你',
-        time: '2020-3-17 21:12',
-        type: 'collection'
-      },
-      {
-        title: '新增使用文档',
-        time: '2024-02-14 0:20',
-        type: 'notice'
-      },
-      {
-        title: '小肥猪给你发了一封邮件',
-        time: '2024-1-20 0:15',
-        type: 'email'
-      },
-      {
-        title: '菜单mock本地真实数据',
-        time: '2024-1-17 22:06',
-        type: 'notice'
-      }
-    ])
-
-    // 消息数据
-    const msgList = ref<MessageItem[]>([
-      {
-        title: '池不胖 关注了你',
-        time: '2021-2-26 23:50',
-        avatar: avatar1
-      },
-      {
-        title: '唐不苦 关注了你',
-        time: '2021-2-21 8:05',
-        avatar: avatar2
-      },
-      {
-        title: '中小鱼 关注了你',
-        time: '2020-1-17 21:12',
-        avatar: avatar3
-      },
-      {
-        title: '何小荷 关注了你',
-        time: '2021-01-14 0:20',
-        avatar: avatar4
-      },
-      {
-        title: '誶誶淰 关注了你',
-        time: '2020-12-20 0:15',
-        avatar: avatar5
-      },
-      {
-        title: '冷月呆呆 关注了你',
-        time: '2020-12-17 22:06',
-        avatar: avatar6
-      }
-    ])
-
-    // 待办数据
-    const pendingList = ref<PendingItem[]>([])
-
-    // 标签栏数据
-    const barList = computed<BarItem[]>(() => [
-      {
-        name: computed(() => t('notice.bar[0]')),
-        num: noticeList.value.length
-      },
-      {
-        name: computed(() => t('notice.bar[1]')),
-        num: msgList.value.length
-      },
-      {
-        name: computed(() => t('notice.bar[2]')),
-        num: pendingList.value.length
-      }
-    ])
-
-    return {
-      noticeList,
-      msgList,
-      pendingList,
-      barList
-    }
-  }
-
-  // 样式管理
-  const useNotificationStyles = () => {
-    const noticeStyleMap: Record<NoticeType, NoticeStyle> = {
-      email: {
-        icon: 'ri:mail-line',
-        iconClass: 'bg-warning/12 text-warning'
-      },
-      message: {
-        icon: 'ri:volume-down-line',
-        iconClass: 'bg-success/12 text-success'
-      },
-      collection: {
-        icon: 'ri:heart-3-line',
-        iconClass: 'bg-danger/12 text-danger'
-      },
-      user: {
-        icon: 'ri:volume-down-line',
-        iconClass: 'bg-info/12 text-info'
-      },
-      notice: {
-        icon: 'ri:notification-3-line',
-        iconClass: 'bg-theme/12 text-theme'
-      }
-    }
-
-    const getNoticeStyle = (type: NoticeType): NoticeStyle => {
-      const defaultStyle: NoticeStyle = {
-        icon: 'ri:arrow-right-circle-line',
-        iconClass: 'bg-theme/12 text-theme'
-      }
-
-      return noticeStyleMap[type] || defaultStyle
-    }
-
-    return {
-      getNoticeStyle
-    }
-  }
-
-  // 动画管理
-  const useNotificationAnimation = () => {
-    const showNotice = (open: boolean) => {
-      if (open) {
-        visible.value = true
-        setTimeout(() => {
-          show.value = true
-        }, 5)
-      } else {
-        show.value = false
-        setTimeout(() => {
-          visible.value = false
-        }, 350)
-      }
-    }
-
-    return {
-      showNotice
-    }
-  }
-
-  // 标签页管理
-  const useTabManagement = (
-    noticeList: Ref<NoticeItem[]>,
-    msgList: Ref<MessageItem[]>,
-    pendingList: Ref<PendingItem[]>,
-    businessHandlers: {
-      handleNoticeAll: () => void
-      handleMsgAll: () => void
-      handlePendingAll: () => void
-    }
-  ) => {
-    const changeBar = (index: number) => {
-      barActiveIndex.value = index
-    }
-
-    // 检查当前标签页是否为空
-    const currentTabIsEmpty = computed(() => {
-      const tabDataMap = [noticeList.value, msgList.value, pendingList.value]
-
-      const currentData = tabDataMap[barActiveIndex.value]
-      return currentData && currentData.length === 0
-    })
-
-    const handleViewAll = () => {
-      // 查看全部处理器映射
-      const viewAllHandlers: Record<number, () => void> = {
-        0: businessHandlers.handleNoticeAll,
-        1: businessHandlers.handleMsgAll,
-        2: businessHandlers.handlePendingAll
-      }
-
-      const handler = viewAllHandlers[barActiveIndex.value]
-      handler?.()
-
-      // 关闭通知面板
-      emit('update:value', false)
-    }
-
-    return {
-      changeBar,
-      currentTabIsEmpty,
-      handleViewAll
-    }
-  }
-
-  // 业务逻辑处理
-  const useBusinessLogic = () => {
-    const handleNoticeAll = () => {
-      // 处理查看全部通知
-      console.log('查看全部通知')
-    }
-
-    const handleMsgAll = () => {
-      // 处理查看全部消息
-      console.log('查看全部消息')
-    }
-
-    const handlePendingAll = () => {
-      // 处理查看全部待办
-      console.log('查看全部待办')
-    }
-
-    return {
-      handleNoticeAll,
-      handleMsgAll,
-      handlePendingAll
-    }
-  }
-
-  // 组合所有逻辑
-  const { noticeList, msgList, pendingList, barList } = useNotificationData()
-  const { getNoticeStyle } = useNotificationStyles()
-  const { showNotice } = useNotificationAnimation()
-  const { handleNoticeAll, handleMsgAll, handlePendingAll } = useBusinessLogic()
-  const { changeBar, currentTabIsEmpty, handleViewAll } = useTabManagement(
-    noticeList,
-    msgList,
-    pendingList,
-    { handleNoticeAll, handleMsgAll, handlePendingAll }
-  )
-
-  // 监听属性变化
-  watch(
-    () => props.value,
-    (newValue) => {
-      showNotice(newValue)
-    }
+  const { locale } = useI18n()
+  const dateFormatter = computed(
+    () => new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'short' })
   )
 </script>
-
-<style scoped>
-  @reference '@styles/core/tailwind.css';
-
-  .art-notification-panel {
-    @apply absolute 
-    top-14.5 
-    right-5 
-    w-90 
-    h-125 
-    overflow-hidden 
-    transition-all 
-    duration-300
-    origin-top 
-    will-change-[top,left] 
-    max-[640px]:top-[65px]
-    max-[640px]:right-0
-    max-[640px]:w-full 
-    max-[640px]:h-[80vh];
-  }
-
-  .bar-active {
-    color: var(--theme-color) !important;
-    border-bottom: 2px solid var(--theme-color);
-  }
-
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 5px !important;
-  }
-
-  .dark .scrollbar-thin::-webkit-scrollbar-track {
-    background-color: var(--default-box-color);
-  }
-
-  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: #222 !important;
-  }
-</style>

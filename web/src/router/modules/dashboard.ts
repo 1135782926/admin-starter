@@ -1,5 +1,18 @@
 import { AppRouteRecord } from '@/types/router'
 
+export const dashboardConsoleRoute = {
+  path: 'console',
+  // 冒号保留给内置路由，避免与后端菜单标识重名。
+  name: 'dashboard:console',
+  component: '/dashboard/console',
+  meta: {
+    title: 'menus.dashboard.console',
+    icon: 'ri:home-smile-2-line',
+    keepAlive: false,
+    fixedTab: true
+  }
+} satisfies AppRouteRecord
+
 export const dashboardRoutes: AppRouteRecord = {
   name: 'Dashboard',
   path: '/dashboard',
@@ -10,17 +23,7 @@ export const dashboardRoutes: AppRouteRecord = {
     roles: ['super-admin', 'admin']
   },
   children: [
-    {
-      path: 'console',
-      name: 'Console',
-      component: '/dashboard/console',
-      meta: {
-        title: 'menus.dashboard.console',
-        icon: 'ri:home-smile-2-line',
-        keepAlive: false,
-        fixedTab: true
-      }
-    },
+    dashboardConsoleRoute,
     {
       path: 'analysis',
       name: 'Analysis',
