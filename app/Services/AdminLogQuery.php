@@ -45,6 +45,23 @@ class AdminLogQuery
         return $query->paginate($filters['per_page'] ?? 20, ['*'], 'page', $filters['page'] ?? 1);
     }
 
+    public function paginatePersonal(AdminUser $actor, int $page): LengthAwarePaginator
+    {
+        return AdminLog::where('actor_id', $actor->id)
+            ->latest()->orderByDesc('id')
+            ->paginate(10, ['id', 'module', 'action', 'success', 'created_at'], 'page', $page);
+    }
+
+    public function lastLoginAt(AdminUser $actor): ?string
+    {
+        return AdminLog::where('actor_id', $actor->id)
+            ->where('module', 'auth')
+            ->where('action', 'login')
+            ->where('success', true)
+            ->latest()
+            ->first(['created_at'])?->created_at?->toISOString();
+    }
+
     public function find(AdminUser $actor, AdminLog $log): AdminLog
     {
         return $this->query($actor)->whereKey($log->id)->firstOrFail();

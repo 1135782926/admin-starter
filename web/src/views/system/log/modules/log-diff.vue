@@ -8,7 +8,7 @@
     </ElTableColumn>
     <ElTableColumn label="变更后" min-width="180">
       <template #default="{ row }">
-        <ElTag v-if="row.password" type="info">已修改</ElTag>
+        <ElTag v-if="row.changed" type="info">已修改</ElTag>
         <span v-else class="whitespace-pre-wrap break-all">{{ row.after }}</span>
       </template>
     </ElTableColumn>
@@ -25,6 +25,8 @@
     email: '邮箱（脱敏）',
     mobile: '手机号（脱敏）',
     password: '密码',
+    avatar: '头像',
+    signature: '个性签名',
     status: '状态',
     role_ids: '角色组 ID',
     permission_ids: '权限 ID',
@@ -80,19 +82,12 @@
   const rows = computed(() =>
     Object.entries(props.changes || {})
       .filter(([field]) => Object.hasOwn(fieldLabels, field))
-      .map(([field, change]) => {
-        const password = field === 'password'
-        return {
-          field,
-          label: fieldLabels[field],
-          password,
-          before: password || !('before' in change) ? '—' : formatValue(field, change.before),
-          after: password
-            ? '已修改'
-            : 'after' in change
-              ? formatValue(field, change.after)
-              : '已修改'
-        }
-      })
+      .map(([field, change]) => ({
+        field,
+        label: fieldLabels[field],
+        changed: 'changed' in change,
+        before: 'before' in change ? formatValue(field, change.before) : '—',
+        after: 'after' in change ? formatValue(field, change.after) : '已修改'
+      }))
   )
 </script>

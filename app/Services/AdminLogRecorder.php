@@ -24,6 +24,8 @@ class AdminLogRecorder
     private const ROUTES = [
         'admin.login' => ['auth', 'login', 'admin', null],
         'admin.logout' => ['auth', 'logout', 'admin', null],
+        'admin.me.profile.update' => ['profile', 'update', 'admin', null],
+        'admin.me.password.update' => ['profile', 'change_password', 'admin', null],
         'admin.admins.store' => ['admin', 'create', 'admin', null],
         'admin.admins.update' => ['admin', 'update', 'admin', 'adminUser'],
         'admin.admins.destroy' => ['admin', 'delete', 'admin', 'adminUser'],
@@ -78,12 +80,18 @@ class AdminLogRecorder
         $level = DB::transactionLevel();
         DB::beginTransaction();
         try {
-            AdminRole::where('guard_name', 'web')->orderBy('id')->select('id')->lockForUpdate()->get();
-            AdminUser::orderBy('id')->select('id')->lockForUpdate()->get();
-            AdminMenu::orderBy('id')->select('id')->lockForUpdate()->get();
+            $profileChange = $request->attributes->get('admin_log.plan')[0] === 'profile';
+            $admins = AdminUser::query();
+            if ($profileChange) {
+                $admins->lockForUpdate();
+            } else {
+                AdminRole::where('guard_name', 'web')->orderBy('id')->select('id')->lockForUpdate()->get();
+                AdminUser::orderBy('id')->select('id')->lockForUpdate()->get();
+                AdminMenu::orderBy('id')->select('id')->lockForUpdate()->get();
+            }
             $actor = $request->user();
-            $current = $actor instanceof AdminUser ? AdminUser::find($actor->id) : null;
-            if (! $current || ! $current->status) {
+            $current = $actor instanceof AdminUser ? $admins->find($actor->id) : null;
+            if (! $current || ! $current->status || ($profileChange && ! $current->tokens()->whereKey($actor->currentAccessToken()->getKey())->exists())) {
                 throw new AuthenticationException;
             }
             $current->withAccessToken($actor->currentAccessToken());
@@ -172,6 +180,11 @@ class AdminLogRecorder
     {
         $plan = $request->attributes->get('admin_log.plan');
         $id = $this->targetId($request);
+        if ($plan[1] === 'change_password') {
+            $this->persist($request, $response->getStatusCode(), $id, $this->actor($request)?->username, ['password' => ['changed' => true]]);
+
+            return;
+        }
         if ($plan[1] === 'create') {
             $payload = json_decode($response->getContent(), true);
             $id = $this->positiveId($payload['data']['id'] ?? null);
@@ -224,7 +237,7 @@ class AdminLogRecorder
             'attempted_username' => $plan[1] === 'login' && ! $actor ? $this->attemptedUsername($request) : null,
             'module' => $plan[0],
             'action' => $plan[1],
-            'permission_name' => $plan[0] === 'auth' ? null : 'system.'.$plan[0].'.'.$plan[1],
+            'permission_name' => in_array($plan[0], ['auth', 'profile'], true) ? null : 'system.'.$plan[0].'.'.$plan[1],
             'route_name' => $request->route()?->getName() ?? 'admin.login',
             'method' => $request->method(),
             'path' => '/'.ltrim($request->route()?->uri() ?? 'api/v1/admin/auth/login', '/'),
@@ -263,6 +276,9 @@ class AdminLogRecorder
     private function targetId(Request $request): ?int
     {
         $plan = $request->attributes->get('admin_log.plan');
+        if (($plan[0] ?? null) === 'profile') {
+            return $this->actor($request)?->id;
+        }
         $target = $plan && $plan[3] ? $request->route($plan[3]) : null;
 
         return $this->positiveId($target instanceof Model ? $target->getKey() : $target);
@@ -280,6 +296,9 @@ class AdminLogRecorder
     {
         if (! $id) {
             return [];
+        }
+        if ($module === 'profile') {
+            return AdminUser::find($id)?->only(['username', 'nickname', 'email', 'mobile', 'avatar', 'signature']) ?? [];
         }
         if ($module === 'admin') {
             $admin = AdminUser::find($id);
@@ -354,7 +373,7 @@ class AdminLogRecorder
     /**
      * @param  array<string, mixed>  $before
      * @param  array<string, mixed>  $after
-     * @return array<string, array{before: mixed, after: mixed}>
+     * @return array<string, array{before: mixed, after: mixed}|array{changed: true}>
      */
     private function diff(array $before, array $after): array
     {
@@ -363,7 +382,9 @@ class AdminLogRecorder
             $old = $before[$field] ?? null;
             $new = $after[$field] ?? null;
             if ($old !== $new) {
-                $changes[$field] = ['before' => $this->sanitize($field, $old), 'after' => $this->sanitize($field, $new)];
+                $changes[$field] = in_array($field, ['avatar', 'signature'], true)
+                    ? ['changed' => true]
+                    : ['before' => $this->sanitize($field, $old), 'after' => $this->sanitize($field, $new)];
             }
         }
 

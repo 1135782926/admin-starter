@@ -45,6 +45,14 @@ Run `php artisan test --compact tests/Feature/AdminAuthenticationTest.php tests/
 
 PHPUnit forcibly overrides inherited server environment values and the shared `Tests\TestCase` refuses to boot tests against any database other than SQLite `:memory:`. Keep both protections when changing local test configuration.
 
+### Administrator personal center
+
+Open 个人中心 from the account menu. Any enabled administrator can use it with a valid bearer token, including accounts with an empty menu. `GET /api/v1/admin/me/profile` reads the current administrator's profile. `PATCH /api/v1/admin/me/profile` accepts `nickname`, `email`, `mobile`, and `signature`. Send multipart `POST` with `_method=PATCH` and `avatar` to replace the avatar. The public storage link and image limits match administrator management.
+
+`PATCH /api/v1/admin/me/password` accepts `current_password`, `password`, and `password_confirmation`. A successful change revokes every token for that administrator and returns the browser to sign-in. Audit records use module `profile` and actions `update` and `change_password`. Password, avatar, and signature changes appear as markers. Email and mobile values are masked.
+
+`GET /api/v1/admin/me/logs?page=1` returns the signed-in administrator's operation timeline and latest successful login time from retained audit history. The timeline returns ten events per page. Each event includes its module, action, result, and timestamp.
+
 ### Administrator and role group management
 
 Run `php artisan migrate --no-interaction` and `php artisan db:seed --class=AdminManagementMenuSeeder --no-interaction` to initialize the `system` directory (权限管理), containing 菜单管理, 管理员管理, 角色组管理, and 管理员日志管理. The seeder ensures `system.menu`, `system.admin`, and `system.role` exist with access/view/create/update/delete permissions, and `system.log` with access/view permissions, without creating accounts or granting ordinary roles new permissions. Existing pages are moved under the directory while preserving their node IDs, permission IDs, configuration, enabled states, and role assignments.
@@ -54,6 +62,8 @@ Administrator endpoints are `GET/POST /api/v1/admin/admins` and `GET/PATCH/DELET
 The administrator list displays saved avatars. The create and edit dialogs preview a selected image and upload it on save. For an avatar upload, send a multipart `POST` with the `avatar` file in JPEG, PNG, WebP, or GIF format, up to 2 MiB. Include `_method=PATCH` for updates. Updates that omit `avatar` preserve the saved image. The public disk serves avatars through the link created by `php artisan storage:link --no-interaction`.
 
 The avatar dialog can choose a public image from the attachment library with the existing attachment view permission, choose a local file, or read a screenshot from the clipboard. If direct clipboard access is unavailable, use the paste dialog. When saved, a library image is copied into avatar storage so that deleting the source attachment leaves the avatar available.
+
+`ArtImageUpload` keeps the image preview beside the upload control. Use `v-model` with one `File` for a replaceable image. For multiple images, set `multiple` and bind `v-model:files` to a `File[]`. Pass saved image URLs via `src`. The form submits the selected files.
 
 Role group endpoints are `GET/POST /api/v1/admin/roles`, `GET/PATCH/DELETE /api/v1/admin/roles/{id}`, `GET /api/v1/admin/roles/options`, and `GET /api/v1/admin/roles/permission-tree`. Groups have a stable code (`name`), display name, parent, status, remark, and `permission_ids`. Deletions require `{"confirmed":true}` and reject groups with children or assigned members. The reserved `super-admin` group is read-only through these APIs. Ordinary administrators may manage only strict descendants of their own enabled groups and accounts whose roles and direct permissions are all within their management scope; their own groups, peers, ancestors, and unrelated groups are not writable.
 
@@ -67,7 +77,7 @@ Apply migrations before serving the updated administrator API; successful logins
 
 `GET /api/v1/admin/logs` returns paginated, filtered records, and `GET /api/v1/admin/logs/{id}` includes sanitized before/after changes. Supported filters are `page`, `per_page` (maximum 100), `keyword`, `actor_id`, `module`, `action`, `success`, `status_code`, `ip_address`, `date_from`, and `date_to`. Datetimes include a timezone. Ordinary readers see their own events and actors currently in their management scope; inaccessible details return 404. Super administrators also see deleted actor snapshots and unverified login attempts. The API and page are read-only.
 
-Login/logout and administrator, role, and menu writes are recorded on success and failure; ordinary reads are excluded. Successful writes and their audit records share a transaction, and login rolls back token issuance if its audit cannot be saved. Logout revokes its current token even if audit persistence fails. Failures have no field diffs or raw exception messages. Email/mobile values are masked, password changes use only a marker, and request bodies, response bodies, credentials, tokens, cookies, and authorization headers are never copied into the audit record. Login 429 records are deduplicated per normalized username, IP, and minute; other failed logins remain individually recorded.
+Login/logout, personal center, administrator, role, menu, and attachment writes are recorded on success and failure. Ordinary reads are excluded. Successful writes and their audit records share a transaction, and login rolls back token issuance if its audit cannot be saved. Logout revokes its current token even if audit persistence fails. Failures have no field diffs or raw exception messages. Email/mobile values are masked, password changes use only a marker, and request bodies, response bodies, credentials, tokens, cookies, and authorization headers are never copied into the audit record. Login 429 records are deduplicated per normalized username, IP, and minute.
 
 `ADMIN_LOG_RETENTION_DAYS` defaults to 90. `php artisan admin-logs:prune --no-interaction` deletes older records in bounded batches; the same command runs daily through Laravel's scheduler. Start `php artisan schedule:work` locally or configure the standard `schedule:run` cron in production. There is no browser deletion endpoint. Run `php artisan test --compact tests/Feature/AdminLogTest.php tests/Feature/AdminLogPruneTest.php` for recording, privacy, rollback, read scope, filters, and retention checks against the isolated test database.
 

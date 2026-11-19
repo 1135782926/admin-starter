@@ -128,6 +128,19 @@ class AdminUserService
         }
     }
 
+    /** @param array{nickname?: string, avatar?: UploadedFile, email?: ?string, mobile?: ?string, signature?: ?string} $data */
+    public function updateProfile(Request $request, array $data): AdminUser
+    {
+        $admin = $request->user();
+        $admin->fill(Arr::only($data, ['nickname', 'email', 'mobile', 'signature']));
+        if (isset($data['avatar'])) {
+            $this->storeAvatar($request, $admin, $data['avatar']);
+        }
+        $admin->save();
+
+        return $admin;
+    }
+
     public function delete(AdminUser $actor, AdminUser $admin): void
     {
         DB::transaction(function () use ($actor, $admin): void {

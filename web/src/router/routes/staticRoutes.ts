@@ -31,6 +31,19 @@ export const staticRoutes: AppRouteRecordRaw[] = [
     meta: { title: '暂无可访问菜单', isHideTab: true, requiresAuth: true }
   },
   {
+    path: '/system/user-center',
+    component: () => import('@views/index/index.vue'),
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'UserCenter',
+        component: () => import('@views/system/user-center/index.vue'),
+        meta: { title: 'menus.system.userCenter', isHideTab: true }
+      }
+    ]
+  },
+  {
     path: '/403',
     name: 'Exception403',
     component: () => import('@views/exception/403/index.vue'),

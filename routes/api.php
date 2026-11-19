@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Common\WangEditorUploadController;
 use App\Http\Controllers\Api\V1\Admin\AdminLogController;
+use App\Http\Controllers\Api\V1\Admin\AdminProfileController;
 use App\Http\Controllers\Api\V1\Admin\AdminUserController;
 use App\Http\Controllers\Api\V1\Admin\AttachmentController;
 use App\Http\Controllers\Api\V1\Admin\AuthController;
@@ -23,6 +24,11 @@ Route::prefix('v1/admin')->name('admin.')->group(function (): void {
         Route::get('me', [AuthController::class, 'me'])->name('me');
         Route::post('auth/logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('me/menus', [MenuController::class, 'current'])->name('me.menus');
+        Route::get('me/profile', [AdminProfileController::class, 'show'])->name('me.profile.show');
+        Route::patch('me/profile', [AdminProfileController::class, 'update'])->name('me.profile.update');
+        Route::patch('me/password', [AdminProfileController::class, 'changePassword'])
+            ->middleware('throttle:admin-password')->name('me.password.update');
+        Route::get('me/logs', [AdminLogController::class, 'personal'])->name('me.logs');
 
         Route::get('logs', [AdminLogController::class, 'index'])->middleware('admin.permission:system.log.view')->name('logs.index');
         Route::get('logs/{log}', [AdminLogController::class, 'show'])->middleware('admin.permission:system.log.view')->name('logs.show');

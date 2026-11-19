@@ -344,15 +344,8 @@ async function handleDynamicRoutes(
 
     // 7. 验证工作标签页
     useWorktabStore().validateWorktabs(router)
-    if (menuList.length === 0) {
-      routeInitInProgress = false
-      closeLoading()
-      next({ name: 'NoAccessibleMenus', replace: true })
-      return
-    }
-
-    // 8. 静态路由不依赖菜单权限，初始化后直接恢复目标地址。
-    if (isStaticRoute(to.path)) {
+    // 8. 个人中心和可公开访问的静态页面独立于后台菜单。
+    if (to.name === 'UserCenter' || (menuList.length > 0 && isStaticRoute(to.path))) {
       routeInitInProgress = false
       next({
         path: to.path,
@@ -360,6 +353,13 @@ async function handleDynamicRoutes(
         hash: to.hash,
         replace: true
       })
+      return
+    }
+
+    if (menuList.length === 0) {
+      routeInitInProgress = false
+      closeLoading()
+      next({ name: 'NoAccessibleMenus', replace: true })
       return
     }
 

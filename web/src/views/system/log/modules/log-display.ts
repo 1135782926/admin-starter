@@ -3,7 +3,8 @@ export const moduleLabels: Record<Api.SystemManage.AdminLogModule, string> = {
   admin: '管理员',
   role: '角色组',
   menu: '菜单',
-  attachment: '附件'
+  attachment: '附件',
+  profile: '个人中心'
 }
 
 export const actionLabels: Record<Api.SystemManage.AdminLogAction, string> = {
@@ -11,7 +12,8 @@ export const actionLabels: Record<Api.SystemManage.AdminLogAction, string> = {
   logout: '退出登录',
   create: '新增',
   update: '修改 / 授权',
-  delete: '删除'
+  delete: '删除',
+  change_password: '修改密码'
 }
 
 export function formatLogTime(value: string) {

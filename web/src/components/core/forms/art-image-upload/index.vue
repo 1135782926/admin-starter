@@ -1,50 +1,60 @@
 <template>
   <div>
-    <div
-      class="image-upload-card grid size-[148px] grid-rows-[30px_1fr_30px] rounded-md border border-dashed"
-    >
-      <button
-        type="button"
-        class="image-upload-action rounded-b-2xl border-b border-dashed text-xs"
-        :disabled="disabled || !allowLibrary"
-        :title="allowLibrary ? '从附件库选择图片' : '需要附件查看权限'"
-        @click="libraryVisible = true"
+    <div class="flex flex-wrap gap-2">
+      <div
+        v-for="(url, index) in previewUrls"
+        :key="`${index}:${url}`"
+        class="image-preview-card relative size-[148px] shrink-0 overflow-hidden rounded-md border"
       >
-        选择
-      </button>
-      <button
-        type="button"
-        class="image-upload-action grid min-h-0 place-items-center"
-        aria-label="上传本地图片"
-        :disabled="disabled"
-        @click="fileInput?.click()"
+        <ElImage :src="url" fit="contain" alt="图片预览" class="size-full" />
+        <span
+          class="image-preview-check absolute top-0 right-0 grid size-7 justify-items-end p-0.5"
+          aria-hidden="true"
+        >
+          <ElIcon :size="12"><Check /></ElIcon>
+        </span>
+      </div>
+      <div
+        class="image-upload-card grid size-[148px] shrink-0 grid-rows-[30px_1fr_30px] rounded-md border border-dashed transition-colors"
+        :class="{ 'is-disabled': disabled }"
       >
-        <img
-          v-if="previewUrl"
-          :src="previewUrl"
-          alt="图片预览"
-          class="size-full min-h-0 object-contain"
-          @error="failedPreview = previewUrl"
-        />
-        <ElIcon v-else :size="26" class="text-g-500"><Plus /></ElIcon>
-      </button>
-      <input
-        ref="fileInput"
-        type="file"
-        hidden
-        :accept="accept"
-        :disabled="disabled"
-        @change="selectLocal"
-      />
-      <button
-        type="button"
-        class="image-upload-action rounded-t-2xl border-t border-dashed text-xs"
-        :disabled="disabled"
-        @click="readClipboard"
-      >
-        截图上传
-      </button>
+        <button
+          type="button"
+          class="image-upload-action rounded-b-2xl border-b border-dashed text-xs"
+          :disabled="disabled || !allowLibrary"
+          :title="allowLibrary ? '从附件库选择图片' : '需要附件查看权限'"
+          @click="libraryVisible = true"
+        >
+          选择
+        </button>
+        <button
+          type="button"
+          class="image-upload-action image-upload-plus grid min-h-0 place-items-center"
+          aria-label="上传本地图片"
+          :disabled="disabled"
+          @click="fileInput?.click()"
+        >
+          <ElIcon :size="26"><Plus /></ElIcon>
+        </button>
+        <button
+          type="button"
+          class="image-upload-action rounded-t-2xl border-t border-dashed text-xs"
+          :disabled="disabled"
+          @click="readClipboard"
+        >
+          截图上传
+        </button>
+      </div>
     </div>
+    <input
+      ref="fileInput"
+      type="file"
+      hidden
+      :accept="accept"
+      :multiple="multiple"
+      :disabled="disabled"
+      @change="selectLocal"
+    />
     <p class="m-0 mt-1 text-xs leading-5 text-g-500"
       >JPG、PNG、WebP、GIF，最大 {{ maxSizeMb }} MB</p
     >
@@ -53,7 +63,7 @@
       v-if="allowLibrary"
       v-model:visible="libraryVisible"
       :max-bytes="maxBytes"
-      @select="selectImage"
+      @select="selectImages([$event])"
     />
     <ElDialog
       v-model="pasteVisible"
@@ -78,13 +88,14 @@
 </template>
 
 <script setup lang="ts">
-  import { Plus } from '@element-plus/icons-vue'
+  import { Check, Plus } from '@element-plus/icons-vue'
   import { ElMessage, type InputInstance } from 'element-plus'
   import ImageLibraryDialog from './image-library-dialog.vue'
 
   const props = withDefaults(
     defineProps<{
-      src?: string | null
+      src?: string | string[] | null
+      multiple?: boolean
       disabled?: boolean
       allowLibrary?: boolean
       maxSizeMb?: number
@@ -92,34 +103,52 @@
     { maxSizeMb: 2 }
   )
   const file = defineModel<File>()
+  const files = defineModel<File[]>('files')
   const fileInput = ref<HTMLInputElement>()
   const pasteInput = ref<InputInstance>()
   const libraryVisible = ref(false)
   const pasteVisible = ref(false)
-  const localUrl = ref('')
-  const failedPreview = ref('')
+  const localUrls = shallowRef<string[]>([])
+  const objectUrls = new Map<File, string>()
   const maxBytes = computed(() => props.maxSizeMb * 1024 * 1024)
   const imageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
   const accept = imageTypes.join(',')
   let clipboardRequest = 0
 
-  const previewUrl = computed(() => {
-    const url = localUrl.value || props.src || ''
-    return url === failedPreview.value ? '' : url
+  const previewUrls = computed(() => {
+    const saved = Array.isArray(props.src)
+      ? props.src.filter(Boolean)
+      : props.src
+        ? [props.src]
+        : []
+    if (props.multiple) return [...saved, ...localUrls.value]
+    return localUrls.value.length ? localUrls.value : saved.slice(0, 1)
   })
 
   watch(
-    file,
-    (image, _, onCleanup) => {
-      const url = image ? URL.createObjectURL(image) : ''
-      localUrl.value = url
-      if (url) onCleanup(() => URL.revokeObjectURL(url))
+    () => (props.multiple ? (files.value?.slice() ?? []) : file.value ? [file.value] : []),
+    (images) => {
+      const selected = new Set(images)
+      for (const [image, url] of objectUrls) {
+        if (!selected.has(image)) {
+          URL.revokeObjectURL(url)
+          objectUrls.delete(image)
+        }
+      }
+      localUrls.value = images.map((image) => {
+        const existingUrl = objectUrls.get(image)
+        if (existingUrl) return existingUrl
+        const url = URL.createObjectURL(image)
+        objectUrls.set(image, url)
+        return url
+      })
     },
     { immediate: true }
   )
 
-  function selectImage(image: File) {
-    if (props.disabled) return false
+  onUnmounted(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)))
+
+  function isValidImage(image: File) {
     if (!imageTypes.includes(image.type)) {
       ElMessage.warning('请选择 JPG、PNG、WebP 或 GIF 图片')
       return false
@@ -128,15 +157,23 @@
       ElMessage.warning(`图片不能超过 ${props.maxSizeMb} MB`)
       return false
     }
-    file.value = image
+    return true
+  }
+
+  function selectImages(images: File[]) {
+    if (props.disabled) return false
+    const accepted = (props.multiple ? images : images.slice(0, 1)).filter(isValidImage)
+    if (!accepted.length) return false
+    if (props.multiple) files.value = [...(files.value ?? []), ...accepted]
+    else file.value = accepted[0]
     return true
   }
 
   function selectLocal(event: Event) {
     const input = event.currentTarget as HTMLInputElement
-    const image = input.files?.[0]
+    const images = Array.from(input.files ?? [])
     input.value = ''
-    if (image) selectImage(image)
+    selectImages(images)
   }
 
   async function readClipboard() {
@@ -150,7 +187,7 @@
         const blob = await item.getType(type)
         if (requestId !== clipboardRequest || !pasteVisible.value) return
         const extension = type === 'image/jpeg' ? 'jpg' : type.split('/')[1]
-        if (selectImage(new File([blob], `paste-${Date.now()}.${extension}`, { type }))) {
+        if (selectImages([new File([blob], `paste-${Date.now()}.${extension}`, { type })])) {
           pasteVisible.value = false
         }
         return
@@ -161,21 +198,40 @@
   }
 
   function pasteImage(event: ClipboardEvent) {
-    const image = Array.from(event.clipboardData?.files ?? []).find((item) =>
+    const images = Array.from(event.clipboardData?.files ?? []).filter((item) =>
       item.type.startsWith('image/')
     )
-    if (!image) {
+    if (!images.length) {
       ElMessage.warning('剪贴板中没有图片，请先复制图片或截图')
       return
     }
-    if (selectImage(image)) pasteVisible.value = false
+    if (selectImages(images)) pasteVisible.value = false
   }
 </script>
 
 <style scoped>
+  .image-preview-card {
+    border-color: var(--el-border-color);
+    background: var(--el-bg-color);
+  }
+
+  .image-preview-check {
+    color: var(--el-color-white);
+    background: var(--el-color-success);
+    clip-path: polygon(0 0, 100% 0, 100% 100%);
+  }
+
   .image-upload-card {
     background: var(--el-fill-color-lighter);
     border-color: var(--el-border-color-darker);
+  }
+
+  .image-upload-card:not(.is-disabled):is(:hover, :focus-within) {
+    border-color: var(--el-color-primary);
+  }
+
+  .image-upload-plus {
+    color: var(--el-text-color-placeholder);
   }
 
   .image-upload-action {
@@ -184,8 +240,7 @@
   }
 
   .image-upload-action:enabled:hover {
-    background: var(--el-fill-color);
-    color: var(--el-color-primary);
+    border-color: var(--el-color-primary);
   }
 
   .image-upload-action:focus-visible {

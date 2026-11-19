@@ -82,6 +82,33 @@ declare namespace Api {
       email: string
       avatar?: string
     }
+
+    interface ProfileInput {
+      nickname: string
+      email: string | null
+      mobile: string | null
+      signature: string | null
+    }
+
+    interface Profile extends ProfileInput {
+      username: string
+      avatar: string | null
+    }
+
+    type PersonalLogRecord = Pick<
+      Api.SystemManage.AdminLogRecord,
+      'id' | 'module' | 'action' | 'success' | 'created_at'
+    >
+
+    interface PersonalLogList extends Api.Common.PaginatedResponse<PersonalLogRecord> {
+      last_login_at: string | null
+    }
+
+    interface ChangePasswordInput {
+      current_password: string
+      password: string
+      password_confirmation: string
+    }
   }
 
   /** 附件管理类型 */
@@ -168,8 +195,8 @@ declare namespace Api {
 
     type AdminList = Api.Common.PaginatedResponse<AdminRecord>
 
-    type AdminLogModule = 'auth' | 'admin' | 'role' | 'menu' | 'attachment'
-    type AdminLogAction = 'login' | 'logout' | 'create' | 'update' | 'delete'
+    type AdminLogModule = 'auth' | 'admin' | 'role' | 'menu' | 'attachment' | 'profile'
+    type AdminLogAction = 'login' | 'logout' | 'create' | 'update' | 'delete' | 'change_password'
     type AdminLogValue =
       | string
       | number
