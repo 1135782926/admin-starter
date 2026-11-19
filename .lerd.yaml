@@ -1,0 +1,7 @@
+php_version: "8.5"
+node_version: "26"
+services:
+  - mysql
+  - redis
+workers:
+  - queue

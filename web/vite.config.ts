@@ -15,6 +15,7 @@ export default ({ mode }: { mode: string }) => {
   const root = process.cwd()
   const env = loadEnv(mode, root)
   const { VITE_VERSION, VITE_PORT, VITE_BASE_URL, VITE_API_URL, VITE_API_PROXY_URL } = env
+  const { VITE_LERD_WEB_HOST, VITE_LERD_API_HOST } = env
 
   console.log(`🚀 API_URL = ${VITE_API_URL}`)
   console.log(`🚀 VERSION = ${VITE_VERSION}`)
@@ -26,10 +27,12 @@ export default ({ mode }: { mode: string }) => {
     base: VITE_BASE_URL,
     server: {
       port: Number(VITE_PORT),
+      allowedHosts: VITE_LERD_WEB_HOST ? [VITE_LERD_WEB_HOST] : [],
       proxy: {
         '/api': {
           target: VITE_API_PROXY_URL,
-          changeOrigin: true
+          changeOrigin: !VITE_LERD_API_HOST,
+          headers: VITE_LERD_API_HOST ? { Host: VITE_LERD_API_HOST } : undefined
         }
       },
       host: true

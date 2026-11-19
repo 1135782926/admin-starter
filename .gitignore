@@ -25,3 +25,7 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+.env.before_lerd
+.env.lerd_override
+.lerd.local.yaml
+/web/.pnpm-store/

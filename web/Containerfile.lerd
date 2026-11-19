@@ -1,0 +1,12 @@
+FROM docker.io/library/node:26-bookworm-slim
+
+RUN npm install --global pnpm@11.28.13
+
+CMD set -eu; \
+    stamp=node_modules/.lerd-install; \
+    checksum=$(sha256sum package.json pnpm-lock.yaml pnpm-workspace.yaml); \
+    if [ ! -x node_modules/.bin/vite ] || [ "$(cat "$stamp" 2>/dev/null || true)" != "$checksum" ]; then \
+        pnpm install --frozen-lockfile --prefer-offline; \
+        printf '%s\n' "$checksum" > "$stamp"; \
+    fi; \
+    exec node node_modules/vite/bin/vite.js --mode lerd --host 0.0.0.0 --port 3006 --strictPort
