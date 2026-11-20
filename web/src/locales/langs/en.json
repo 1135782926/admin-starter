@@ -24,12 +24,6 @@
       "github": "Github",
       "lockScreen": "Lock screen",
       "logout": "Log out"
-    },
-    "guide": {
-      "title": "Click here to view",
-      "theme": "Theme style",
-      "menu": "Open top menu",
-      "description": "More configurations"
     }
   },
   "common": {

@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- Remove the automatic setup hint from the top-bar settings button.
 - Connect administrator login, current user, logout, and permitted menus to Laravel using a single Bearer token.
 - Default development and production to backend permissions, with a Laravel development proxy and same-origin production API.
 - Ignore responses from previous sessions, preserve authentication on 403, and show an empty state when no menus are accessible.
