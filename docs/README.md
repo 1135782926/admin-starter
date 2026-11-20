@@ -13,7 +13,9 @@
 
 ## API
 
-API routes are defined in `routes/api.php` and use Laravel Sanctum authentication. The `GET /api/user` endpoint returns the authenticated user when supplied with a valid `Authorization: Bearer <token>` header. Missing or invalid tokens return a JSON response with HTTP status `401`.
+Public API routes are defined in `routes/api.php`. The `GET /api/user` endpoint uses Laravel Sanctum and returns the authenticated user when supplied with a valid `Authorization: Bearer <token>` header. Missing or invalid tokens return a JSON response with HTTP status `401`.
+
+Administrator API routes are defined in `routes/admin.php`. Both route files are registered in `bootstrap/app.php` under the `/api` prefix and the `api` middleware group.
 
 Run `php artisan migrate` to create the personal access token table. Run `php artisan test --compact tests/Feature/ApiAuthenticationTest.php` to verify API authentication.
 
@@ -92,6 +94,14 @@ Uploads default to the private `local` disk. Only images may be explicitly publi
 Allowed formats are JPEG/PNG/WebP/GIF, PDF, DOC/DOCX, XLS/XLSX, TXT, and ZIP. Both the original extension and actual MIME type are validated; SVG, executables, corrupt images, and oversized files are rejected. Defaults are 50 MiB per file (`ATTACHMENT_MAX_SIZE`, bytes), 30 uploads per minute per administrator (`ATTACHMENT_UPLOADS_PER_MINUTE`), and 300-second signed URLs (`ATTACHMENT_TEMPORARY_URL_TTL`). Frontend batches contain at most ten files sent separately. PHP and reverse-proxy request-body limits must also allow the configured size. Attachment writes use administrator auditing; upload rollback removes newly stored files, while deletion retries tolerate an already missing file.
 
 Run `php artisan test --compact tests/Feature/AttachmentManagementTest.php tests/Feature/AdminLogTest.php` to verify upload, storage, permissions, filtering, signed URLs, direct deletion, editor upload, auditing, throttling, and failure cleanup.
+
+Standard model-backed lists such as members and attachments extend `App\Services\BaseListService`. Supply `listQuery()` with the model query and any required relations, constraints, or primary sort. The inherited `paginate()` defaults to page 1 and 20 rows and appends the primary key in descending order for stable pagination. Override `allowedFilters()` to declare filters using `AllowedFilter::exact()`, `TableFilters::keyword()`, or `TableFilters::dateRange()`. Keep the matching rules in the request. All filters use validated flat parameters. Audit logs apply the same filter helpers to a query built for the current administrator.
+
+## Member management
+
+Run `php artisan migrate --no-interaction` and `php artisan db:seed --class=MemberManagementMenuSeeder --no-interaction` when adding this feature to an existing installation. The migration creates the initial 默认分组. The menu seeder registers 会员管理 and its access, view, create, update, and group-management permissions. Use the existing public storage link for avatars.
+
+`GET /api/v1/admin/members` supports `keyword`, `member_group_id`, `status` (`0` or `1`), `page`, and `per_page`. Use `POST /members` and `PATCH /members/{id}` under the same prefix to create and update records. A password is required on creation. Omitting it on update preserves the current hash. Avatar replacement uses multipart with `_method=PATCH`. An explicit JSON `avatar: null` clears it. The group dropdown uses `GET /member-groups`, and authorized administrators maintain group names with `POST /member-groups` and `PATCH /member-groups/{id}`. Member and group writes are audited. The membership tables are separate from administrator and existing user accounts.
 
 ## Frontend
 

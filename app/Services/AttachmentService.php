@@ -4,8 +4,6 @@ namespace App\Services;
 
 use App\Models\AdminUser;
 use App\Models\Attachment;
-use Carbon\CarbonImmutable;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -15,51 +13,38 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Spatie\QueryBuilder\AllowedFilter;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-class AttachmentService
+/** @extends BaseListService<Attachment> */
+class AttachmentService extends BaseListService
 {
     public function __construct(private AdminLogRecorder $logs) {}
 
-    /**
-     * @param  array<string, mixed>  $filters
-     * @return LengthAwarePaginator<int, Attachment>
-     */
-    public function paginate(array $filters): LengthAwarePaginator
+    protected function listQuery(): Builder
     {
-        $query = Attachment::query()
-            ->with(['uploader:id,username,nickname'])
-            ->orderByDesc('created_at')
-            ->orderByDesc('id');
-        $keyword = trim($filters['keyword'] ?? '');
-        if ($keyword !== '') {
-            $query->where(function (Builder $query) use ($keyword): void {
-                $query->where('title', 'like', '%'.$keyword.'%')
-                    ->orWhere('original_name', 'like', '%'.$keyword.'%')
-                    ->orWhere('category', 'like', '%'.$keyword.'%');
-            });
-        }
-        foreach (['category', 'visibility', 'admin_user_id'] as $filter) {
-            if (isset($filters[$filter])) {
-                $query->where($filter, $filters[$filter]);
-            }
-        }
-        if (isset($filters['type'])) {
-            match ($filters['type']) {
-                'image' => $query->where('is_image', true),
-                'document' => $query->whereIn('extension', ['pdf', 'doc', 'docx', 'xls', 'xlsx']),
-                'archive' => $query->where('extension', 'zip'),
-                'text' => $query->where('extension', 'txt'),
-            };
-        }
-        foreach (['date_from' => '>=', 'date_to' => '<='] as $filter => $operator) {
-            if (isset($filters[$filter])) {
-                $datetime = CarbonImmutable::parse($filters[$filter])->setTimezone(config('app.timezone', 'UTC'));
-                $query->where('created_at', $operator, $datetime->toDateTimeString());
-            }
-        }
+        return Attachment::query()
+            ->with('uploader:id,username,nickname')
+            ->orderByDesc('created_at');
+    }
 
-        return $query->paginate($filters['per_page'] ?? 20, ['*'], 'page', $filters['page'] ?? 1);
+    protected function allowedFilters(): array
+    {
+        return [
+            TableFilters::keyword('title', 'original_name', 'category'),
+            AllowedFilter::exact('category'),
+            AllowedFilter::exact('visibility'),
+            AllowedFilter::exact('admin_user_id'),
+            AllowedFilter::callback('type', function (Builder $query, string $type): void {
+                match ($type) {
+                    'image' => $query->where('is_image', true),
+                    'document' => $query->whereIn('extension', ['pdf', 'doc', 'docx', 'xls', 'xlsx']),
+                    'archive' => $query->where('extension', 'zip'),
+                    'text' => $query->where('extension', 'txt'),
+                };
+            }),
+            ...TableFilters::dateRange(),
+        ];
     }
 
     /** @param array<string, mixed> $data */

@@ -4,6 +4,8 @@ export const moduleLabels: Record<Api.SystemManage.AdminLogModule, string> = {
   role: '角色组',
   menu: '菜单',
   attachment: '附件',
+  member: '会员',
+  member_group: '会员分组',
   profile: '个人中心'
 }
 

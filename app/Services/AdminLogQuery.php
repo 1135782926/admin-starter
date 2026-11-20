@@ -4,9 +4,9 @@ namespace App\Services;
 
 use App\Models\AdminLog;
 use App\Models\AdminUser;
-use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Spatie\QueryBuilder\AllowedFilter;
 
 class AdminLogQuery
 {
@@ -21,26 +21,19 @@ class AdminLogQuery
             'target_type', 'target_id', 'target_label', 'status_code', 'success',
             'ip_address', 'user_agent', 'duration_ms', 'created_at',
         ])->orderByDesc('created_at')->orderByDesc('id');
-        $keyword = trim($filters['keyword'] ?? '');
-        if ($keyword !== '') {
-            $query->where(function (Builder $query) use ($keyword): void {
-                $query->where('actor_username', 'like', '%'.$keyword.'%')
-                    ->orWhere('actor_nickname', 'like', '%'.$keyword.'%')
-                    ->orWhere('attempted_username', 'like', '%'.$keyword.'%')
-                    ->orWhere('target_label', 'like', '%'.$keyword.'%');
-            });
-        }
-        foreach (['actor_id', 'module', 'action', 'success', 'status_code', 'ip_address'] as $filter) {
-            if (isset($filters[$filter])) {
-                $query->where($filter, $filters[$filter]);
-            }
-        }
-        foreach (['date_from' => '>=', 'date_to' => '<='] as $filter => $operator) {
-            if (isset($filters[$filter])) {
-                $datetime = CarbonImmutable::parse($filters[$filter])->setTimezone(config('app.timezone', 'UTC'));
-                $query->where('created_at', $operator, $datetime->toDateTimeString());
-            }
-        }
+
+        TableFilters::apply(
+            $query,
+            $filters,
+            TableFilters::keyword('actor_username', 'actor_nickname', 'attempted_username', 'target_label'),
+            AllowedFilter::exact('actor_id'),
+            AllowedFilter::exact('module'),
+            AllowedFilter::exact('action'),
+            AllowedFilter::exact('success'),
+            AllowedFilter::exact('status_code'),
+            AllowedFilter::exact('ip_address'),
+            ...TableFilters::dateRange(),
+        );
 
         return $query->paginate($filters['per_page'] ?? 20, ['*'], 'page', $filters['page'] ?? 1);
     }

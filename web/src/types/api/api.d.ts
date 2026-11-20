@@ -195,7 +195,15 @@ declare namespace Api {
 
     type AdminList = Api.Common.PaginatedResponse<AdminRecord>
 
-    type AdminLogModule = 'auth' | 'admin' | 'role' | 'menu' | 'attachment' | 'profile'
+    type AdminLogModule =
+      | 'auth'
+      | 'admin'
+      | 'role'
+      | 'menu'
+      | 'attachment'
+      | 'profile'
+      | 'member'
+      | 'member_group'
     type AdminLogAction = 'login' | 'logout' | 'create' | 'update' | 'delete' | 'change_password'
     type AdminLogValue =
       | string
@@ -221,7 +229,7 @@ declare namespace Api {
       route_name: string
       method: string
       path: string
-      target_type: 'admin' | 'role' | 'menu' | 'attachment' | null
+      target_type: 'admin' | 'role' | 'menu' | 'attachment' | 'member' | 'member_group' | null
       target_id: number | null
       target_label: string | null
       status_code: number

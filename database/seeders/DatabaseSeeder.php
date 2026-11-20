@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
 
         $this->call(AdminManagementMenuSeeder::class);
         $this->call(AttachmentManagementMenuSeeder::class);
+        $this->call(MemberManagementMenuSeeder::class);
         $this->call(AdminUserSeeder::class);
     }
 }

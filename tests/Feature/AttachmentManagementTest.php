@@ -271,6 +271,38 @@ test('filters the shared attachment library by every supported list field', func
         ->assertOk()->assertJsonPath('data.total', 0);
 });
 
+test('lists attachments newest first with a stable order for equal timestamps', function (): void {
+    $this->seed(AttachmentManagementMenuSeeder::class);
+    $actor = attachmentSuperAdmin();
+    $first = Attachment::factory()->create(['created_at' => '2026-11-18 12:00:00']);
+    $second = Attachment::factory()->create(['created_at' => '2026-11-18 12:00:00']);
+    $older = Attachment::factory()->create(['created_at' => '2026-11-17 12:00:00']);
+
+    $this->withToken($actor->createToken('attachment-default-list')->plainTextToken)
+        ->getJson('/api/v1/admin/attachments')->assertOk()
+        ->assertJsonPath('data.current', 1)->assertJsonPath('data.size', 20)
+        ->assertJsonPath('data.records.0.id', $second->id)
+        ->assertJsonPath('data.records.1.id', $first->id)
+        ->assertJsonPath('data.records.2.id', $older->id);
+});
+
+test('preserves literal text in attachment filters', function (string $field, string $value, string $otherValue): void {
+    $this->seed(AttachmentManagementMenuSeeder::class);
+    $actor = attachmentSuperAdmin();
+    $column = $field === 'keyword' ? 'title' : 'category';
+    $matching = Attachment::factory()->create([$column => $value]);
+    Attachment::factory()->create([$column => $otherValue]);
+
+    $this->withToken($actor->createToken('attachment-text-filter')->plainTextToken)
+        ->getJson('/api/v1/admin/attachments?'.http_build_query([$field => $value]))
+        ->assertOk()->assertJsonPath('data.total', 1)->assertJsonPath('data.records.0.id', $matching->id);
+})->with([
+    'keyword containing a comma' => ['keyword', 'annual, draft', 'annual'],
+    'category containing a comma' => ['category', 'reports, drafts', 'reports'],
+    'keyword that looks like a boolean' => ['keyword', 'true', '1'],
+    'category that looks like a boolean' => ['category', 'false', '0'],
+]);
+
 test('maps each list type filter to its attachment formats', function (string $type, string $extension): void {
     Storage::fake('local');
     $this->seed(AttachmentManagementMenuSeeder::class);

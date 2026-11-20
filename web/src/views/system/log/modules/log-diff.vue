@@ -26,6 +26,9 @@
     mobile: '手机号（脱敏）',
     password: '密码',
     avatar: '头像',
+    member_group_id: '会员分组 ID',
+    gender: '性别',
+    birthday: '生日',
     signature: '个性签名',
     status: '状态',
     role_ids: '角色组 ID',
@@ -61,6 +64,10 @@
           .map(([key, item]) => `${key}：${formatValue(key, item)}`)
           .join('\n') || '空值'
       )
+    }
+    if (field === 'gender') {
+      const labels: Record<string, string> = { unknown: '未知', male: '男', female: '女' }
+      return labels[String(value)] || String(value)
     }
     if (field === 'type') {
       return (

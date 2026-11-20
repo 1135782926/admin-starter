@@ -7,6 +7,8 @@ use App\Models\AdminMenu;
 use App\Models\AdminRole;
 use App\Models\AdminUser;
 use App\Models\Attachment;
+use App\Models\Member;
+use App\Models\MemberGroup;
 use Closure;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\Model;
@@ -38,6 +40,10 @@ class AdminLogRecorder
         'admin.attachments.store' => ['attachment', 'create', 'attachment', null],
         'admin.attachments.update' => ['attachment', 'update', 'attachment', 'attachment'],
         'admin.attachments.destroy' => ['attachment', 'delete', 'attachment', 'attachment'],
+        'admin.members.store' => ['member', 'create', 'member', null],
+        'admin.members.update' => ['member', 'update', 'member', 'member'],
+        'admin.member-groups.store' => ['member_group', 'create', 'member_group', null],
+        'admin.member-groups.update' => ['member_group', 'update', 'member_group', 'memberGroup'],
         'admin.wangeditor.store' => ['attachment', 'create', 'attachment', null],
     ];
 
@@ -195,7 +201,7 @@ class AdminLogRecorder
         $before = $request->attributes->get('admin_log.before', []);
         $after = $this->snapshot($plan[0], $id);
         $changes = $this->diff($before, $after);
-        if ($plan[0] === 'admin' && $plan[1] !== 'delete' && $request->filled('password')) {
+        if (in_array($plan[0], ['admin', 'member'], true) && $plan[1] !== 'delete' && $request->filled('password')) {
             $changes['password'] = ['changed' => true];
         }
         $related = [];
@@ -217,6 +223,9 @@ class AdminLogRecorder
             }
         }
         $label = $after['username'] ?? $after['display_name'] ?? $after['title'] ?? $before['username'] ?? $before['display_name'] ?? $before['title'] ?? null;
+        if ($plan[0] === 'member_group') {
+            $label = $after['name'] ?? $before['name'] ?? null;
+        }
         $this->persist($request, $response->getStatusCode(), $id, $label, $changes ?: null, $related ?: null);
     }
 
@@ -325,6 +334,17 @@ class AdminLogRecorder
                 'width', 'height', 'disk', 'object_key', 'visibility', 'is_image', 'admin_user_id',
             ]) : [];
         }
+        if ($module === 'member') {
+            $member = Member::find($id);
+
+            return $member ? [
+                ...$member->only(['username', 'nickname', 'member_group_id', 'email', 'mobile', 'gender', 'avatar', 'signature', 'status']),
+                'birthday' => $member->birthday?->toDateString(),
+            ] : [];
+        }
+        if ($module === 'member_group') {
+            return MemberGroup::find($id)?->only(['name']) ?? [];
+        }
         $menu = AdminMenu::find($id);
 
         return $menu ? $this->menuSnapshot($menu) : [];
@@ -382,7 +402,7 @@ class AdminLogRecorder
             $old = $before[$field] ?? null;
             $new = $after[$field] ?? null;
             if ($old !== $new) {
-                $changes[$field] = in_array($field, ['avatar', 'signature'], true)
+                $changes[$field] = in_array($field, ['avatar', 'birthday', 'signature'], true)
                     ? ['changed' => true]
                     : ['before' => $this->sanitize($field, $old), 'after' => $this->sanitize($field, $new)];
             }

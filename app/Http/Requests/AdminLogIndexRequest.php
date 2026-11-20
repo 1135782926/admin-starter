@@ -29,7 +29,7 @@ class AdminLogIndexRequest extends FormRequest
             'per_page' => ['sometimes', 'integer', 'between:1,100'],
             'keyword' => ['sometimes', 'nullable', 'string', 'max:255'],
             'actor_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
-            'module' => ['sometimes', 'nullable', Rule::in(['auth', 'admin', 'role', 'menu', 'attachment', 'profile'])],
+            'module' => ['sometimes', 'nullable', Rule::in(['auth', 'admin', 'role', 'menu', 'attachment', 'profile', 'member', 'member_group'])],
             'action' => ['sometimes', 'nullable', Rule::in(['login', 'logout', 'create', 'update', 'delete', 'change_password'])],
             'success' => ['sometimes', 'boolean'],
             'status_code' => ['sometimes', 'nullable', 'integer', 'between:100,599'],
