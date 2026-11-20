@@ -4,4 +4,5 @@ services:
   - mysql
   - redis
 workers:
-  - queue
+  - reverb
+  - schedule

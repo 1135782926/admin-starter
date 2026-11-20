@@ -44,6 +44,11 @@ class AdminMenuRequest extends FormRequest
             'url' => $type === 'menu' && in_array($openType, ['external', 'iframe'], true) ? [$required, 'required', 'url:http,https', 'max:2048'] : ['prohibited'],
             'icon' => $type !== 'button' ? ['sometimes', 'nullable', 'string', 'max:255'] : ['prohibited'],
             'sort' => ['sometimes', 'integer', 'between:-2147483648,2147483647'],
+            'placement' => $updating && $type !== 'button'
+                ? ['sometimes', 'array:target_id,position', 'required_array_keys:target_id,position']
+                : ['missing'],
+            'placement.target_id' => ['required_with:placement', 'integer', 'min:1'],
+            'placement.position' => ['required_with:placement', Rule::in(['before', 'after'])],
             'status' => ['sometimes', 'boolean'],
             'keep_alive' => $type === 'menu' && $openType === 'page' ? ['sometimes', 'boolean'] : ['prohibited'],
             'remark' => ['sometimes', 'nullable', 'string', 'max:10000'],
@@ -57,6 +62,12 @@ class AdminMenuRequest extends FormRequest
         return [function (Validator $validator): void {
             $menu = $this->route('menu');
             if (! $menu instanceof AdminMenu || $validator->errors()->isNotEmpty()) {
+                return;
+            }
+
+            if ($this->has('placement') && $this->hasAny(['parent_id', 'sort'])) {
+                $validator->errors()->add('placement', '拖动位置不能与上级节点或排序值同时提交。');
+
                 return;
             }
 

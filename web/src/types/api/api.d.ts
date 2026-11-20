@@ -365,7 +365,9 @@ declare namespace Api {
       buttons?: string[]
     }
 
-    type MenuUpdateInput = Partial<Omit<MenuInput, 'type' | 'name' | 'buttons'>>
+    type MenuUpdateInput = Partial<Omit<MenuInput, 'type' | 'name' | 'buttons'>> & {
+      placement?: { target_id: number; position: 'before' | 'after' }
+    }
 
     interface MenuDeletionImpact {
       children_count: number

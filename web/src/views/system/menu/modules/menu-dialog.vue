@@ -18,7 +18,11 @@
       label-width="110px"
       :show-reset="false"
       :show-submit="false"
-    />
+    >
+      <template #icon>
+        <ArtIconPicker v-model="form.icon" :disabled="saving" />
+      </template>
+    </ArtForm>
 
     <template #footer>
       <span class="dialog-footer">
@@ -32,6 +36,7 @@
 <script setup lang="ts">
   import type { FormRules } from 'element-plus'
   import ArtForm, { type FormItem } from '@/components/core/forms/art-form/index.vue'
+  import ArtIconPicker from '@/components/core/forms/art-icon-picker/index.vue'
   import {
     buildParentOptions,
     menuOpenTypeLabels,
@@ -146,7 +151,6 @@
       checkStrictly: true
     },
     clearable: true,
-    placeholder: '根节点',
     class: '!w-full'
   }
 
@@ -229,6 +233,7 @@
         type: 'radiogroup',
         props: {
           options: typeOptions.value,
+          title: '目录归类菜单，菜单打开页面，按钮控制操作权限',
           disabled: props.mode === 'edit' || typeOptions.value.length === 1
         }
       },
@@ -238,21 +243,39 @@
         type: 'treeselect',
         props: {
           ...treeSelectProps,
+          placeholder: form.type === 'button' ? '请选择所属菜单' : '请选择所属目录，留空为根节点',
           data: parentOptions.value,
           disabled: props.mode === 'edit' && form.type === 'button'
         }
       },
-      { label: '名称', key: 'title', type: 'input', props: { maxlength: 255 } },
+      {
+        label: '名称',
+        key: 'title',
+        type: 'input',
+        props: { maxlength: 255, placeholder: '请输入显示名称，如「会员管理」' }
+      },
       {
         label: '节点标识',
         key: 'name',
         type: 'input',
-        props: { maxlength: 248, disabled: props.mode === 'edit' }
+        props: {
+          maxlength: 248,
+          disabled: props.mode === 'edit',
+          placeholder:
+            form.type === 'button'
+              ? '请输入权限标识，如 system.member.export（创建后不可修改）'
+              : '请输入唯一标识，如 system.member（创建后不可修改）'
+        }
       }
     ]
 
     if (form.type !== 'button') {
-      items.push({ label: '路由地址', key: 'path', type: 'input', props: { maxlength: 255 } })
+      items.push({
+        label: '路由地址',
+        key: 'path',
+        type: 'input',
+        props: { maxlength: 255, placeholder: '请输入以 / 开头的路径，如 /system/member' }
+      })
     }
 
     if (form.type === 'menu') {
@@ -260,23 +283,35 @@
         label: '打开方式',
         key: 'open_type',
         type: 'radiogroup',
-        props: { options: openTypeOptions, disabled: props.mode === 'edit' }
+        props: {
+          options: openTypeOptions,
+          disabled: props.mode === 'edit',
+          title: '外部链接在新标签页打开，内嵌页面在后台打开'
+        }
       })
       if (form.open_type === 'page') {
         items.push({
           label: '组件路径',
           key: 'component',
           type: 'input',
-          props: { maxlength: 255 }
+          props: {
+            maxlength: 255,
+            placeholder: '请输入 src/views 下的组件路径，如 /system/member/index（省略 .vue）'
+          }
         })
         items.push({
           label: '页面缓存',
           key: 'keep_alive',
           type: 'radiogroup',
-          props: { options: statusOptions }
+          props: { options: statusOptions, title: '启用后，切换页面再返回时保留页面状态' }
         })
       } else {
-        items.push({ label: '链接地址', key: 'url', type: 'input', props: { maxlength: 2048 } })
+        items.push({
+          label: '链接地址',
+          key: 'url',
+          type: 'input',
+          props: { maxlength: 2048, placeholder: '请输入完整链接，如 https://example.com' }
+        })
       }
       if (props.mode === 'create' && form.open_type === 'page') {
         items.push({
@@ -284,13 +319,13 @@
           key: 'buttons',
           type: 'checkboxgroup',
           span: 24,
-          props: { options: buttonOptions }
+          props: { options: buttonOptions, title: '勾选创建菜单时一并生成的操作权限' }
         })
       }
     }
 
     if (form.type !== 'button') {
-      items.push({ label: '图标', key: 'icon', type: 'input', props: { maxlength: 255 } })
+      items.push({ label: '图标', key: 'icon' })
     }
 
     items.push(
@@ -298,15 +333,33 @@
         label: '排序',
         key: 'sort',
         type: 'number',
-        props: { min: -2147483648, max: 2147483647, class: '!w-full' }
+        props: {
+          min: -2147483648,
+          max: 2147483647,
+          class: '!w-full',
+          title: '数值越小，在同级节点中越靠前'
+        }
       },
-      { label: '状态', key: 'status', type: 'radiogroup', props: { options: statusOptions } },
+      {
+        label: '状态',
+        key: 'status',
+        type: 'radiogroup',
+        props: {
+          options: statusOptions,
+          title: form.type === 'button' ? '禁用后操作权限失效' : '禁用后此节点及下级不可访问'
+        }
+      },
       {
         label: '备注',
         key: 'remark',
         type: 'input',
         span: 24,
-        props: { type: 'textarea', rows: 3, maxlength: 10000 }
+        props: {
+          type: 'textarea',
+          rows: 3,
+          maxlength: 10000,
+          placeholder: '可填写节点用途或维护说明'
+        }
       }
     )
 

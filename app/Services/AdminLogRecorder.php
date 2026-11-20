@@ -148,6 +148,13 @@ class AdminLogRecorder
         $id = $this->targetId($request);
         $request->attributes->set('admin_log.before', $this->snapshot($plan[0], $id));
         $request->attributes->set('admin_log.related_before', $plan[0] === 'role' && $id ? $this->descendants($id) : []);
+        if ($plan[0] === 'menu' && $plan[1] === 'update' && ($anchorId = $this->positiveId($request->input('placement.target_id')))) {
+            $anchor = AdminMenu::find($anchorId, ['id', 'parent_id']);
+            if ($anchor) {
+                $request->attributes->set('admin_log.menu_sorts_before', AdminMenu::where('parent_id', $anchor->parent_id)
+                    ->whereKeyNot($id)->pluck('sort', 'id')->all());
+            }
+        }
     }
 
     public function loginSucceeded(Request $request, AdminUser $actor): void
@@ -220,6 +227,18 @@ class AdminLogRecorder
         if ($plan[0] === 'menu' && $plan[1] === 'create') {
             foreach (AdminMenu::where('parent_id', $id)->where('type', 'button')->get() as $button) {
                 $related[] = ['type' => 'menu', 'id' => $button->id, 'label' => $button->title, 'changes' => $this->diff([], $this->menuSnapshot($button))];
+            }
+        }
+        $previousSorts = $request->attributes->get('admin_log.menu_sorts_before', []);
+        if ($previousSorts !== []) {
+            foreach (AdminMenu::whereKey(array_keys($previousSorts))->get(['id', 'title', 'sort']) as $sibling) {
+                $previousSort = $previousSorts[$sibling->id];
+                if ($previousSort !== $sibling->sort) {
+                    $related[] = [
+                        'type' => 'menu', 'id' => $sibling->id, 'label' => $sibling->title,
+                        'changes' => ['sort' => ['before' => $previousSort, 'after' => $sibling->sort]],
+                    ];
+                }
             }
         }
         $label = $after['username'] ?? $after['display_name'] ?? $after['title'] ?? $before['username'] ?? $before['display_name'] ?? $before['title'] ?? null;

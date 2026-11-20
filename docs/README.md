@@ -41,6 +41,8 @@ After reviewing the database connection, run `php artisan migrate --no-interacti
 
 Menu endpoints are `GET/POST /menus`, `GET/PATCH/DELETE /menus/{id}`, `GET /menus/permission-tree`, `GET /menus/{id}/deletion-impact`, and `GET /me/menus`. Deletion requires a JSON body containing `{"confirmed":true}` and rejects nodes with children. Page creation defaults to four basic buttons; send `"buttons":[]` for none, or select from `view/create/update/delete`. Node names and types are immutable. Custom button names must use the parent menu's prefix, for example `goods.export`.
 
+Menu drag sorting uses `PATCH /menus/{id}` with `placement.target_id` and `placement.position` (`before` or `after`). The server saves the order within the target node's sibling group. Dropping into a directory or onto the root drop area uses `parent_id`.
+
 Controlled business routes must use `admin.auth` and `admin.permission:<full permission name>` (for example `admin.permission:goods.update`). This checks the page access permission, operation permission and every ancestor's enabled state, including for `super-admin`. Raw Spatie `can()` checks do not include menu branch status. Menu writes are transactional; permission caches are cleared again after commit. Route configuration does not register backend business endpoints.
 
 Run `php artisan test --compact tests/Feature/AdminAuthenticationTest.php tests/Feature/AdminMenuTest.php tests/Feature/AdminUserTest.php tests/Feature/ApiAuthenticationTest.php tests/Feature/PermissionTableMigrationTest.php` to verify these boundaries. Tests migrate an isolated SQLite in-memory database; do not run development migrations merely to execute tests.

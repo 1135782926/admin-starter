@@ -31,9 +31,10 @@
 
       <div
         v-if="draggingNode"
+        ref="rootDropZone"
         class="mb-2 flex items-center justify-center rounded-md border border-dashed border-theme bg-theme/5 p-2 text-sm text-theme"
+        :class="{ 'menu-root-drop-active': dropTarget?.parent_id === null }"
         @dragover.prevent
-        @drop.prevent="handleRootDrop"
       >
         将“{{ draggingNode.title }}”拖到此处可移动到根节点
       </div>
@@ -42,10 +43,9 @@
         :model-value="filteredTree"
         target="tbody"
         handle=".menu-move-handle"
-        :animation="150"
-        :custom-update="handleDragUpdate"
+        :sort="false"
+        :disabled="loading || dragSaving || !canEdit"
         @start="handleDragStart"
-        @move="handleDragMove"
         @end="handleDragEnd"
       >
         <ArtTable
@@ -53,6 +53,7 @@
           :columns="columns"
           :data="filteredTree"
           row-key="id"
+          :row-class-name="dragRowClass"
           :tree-props="{ children: 'children' }"
           :default-expand-all="expanded"
           :empty-text="failed ? '菜单加载失败' : '暂无符合条件的菜单'"
@@ -61,7 +62,7 @@
             <div class="flex items-center" :data-menu-node-id="row.id">
               <ElTooltip
                 v-if="canEdit && row.type !== 'button'"
-                content="按住拖动到目标层级"
+                content="拖到节点上沿或下沿排序，拖到目录中央移入目录"
                 placement="top"
               >
                 <ArtButtonTable
@@ -136,6 +137,7 @@
   import { useAuth } from '@/hooks/core/useAuth'
   import { useTableColumns } from '@/hooks/core/useTableColumns'
   import { useRouter } from 'vue-router'
+  import { useEventListener } from '@vueuse/core'
   import type { SearchFormItem } from '@/components/core/forms/art-search-bar/index.vue'
   import { refreshAdminRouteContext } from '@/router/guards/beforeEach'
   import MenuDialog from './modules/menu-dialog.vue'
@@ -377,71 +379,96 @@
   }
 
   const draggingNode = ref<MenuNode | null>(null)
-  const dragParentId = ref<number | null | undefined>(undefined)
+  const rootDropZone = useTemplateRef<HTMLDivElement>('rootDropZone')
   const dragSaving = ref(false)
-  let dragChanged = false
-  let rootDropRequested = false
+  const dropTarget = shallowRef<MenuUpdateInput>()
+  let dragTableBody: HTMLElement | undefined
+
+  useEventListener(document, ['dragover', 'mousemove', 'touchmove'], updateDropTarget, {
+    capture: true,
+    passive: true
+  })
+
+  function dragRowClass({ row }: { row: MenuNode }): string {
+    if (draggingNode.value?.id === row.id) return 'menu-drag-source'
+    const target = dropTarget.value
+    if (target?.parent_id === row.id) return 'menu-drop-inside'
+    if (target?.placement?.target_id === row.id) return `menu-drop-${target.placement.position}`
+    return ''
+  }
+
+  function updateDropTarget(event: MouseEvent | TouchEvent): void {
+    const node = draggingNode.value
+    if (!node || !dragTableBody) return
+    const next = resolveDrop(node, dragTableBody, event)
+    const current = dropTarget.value
+    if (
+      current?.parent_id !== next?.parent_id ||
+      current?.placement?.target_id !== next?.placement?.target_id ||
+      current?.placement?.position !== next?.placement?.position
+    ) {
+      dropTarget.value = next
+    }
+  }
 
   function rowNodeId(element: HTMLElement): number | null {
     const id = element.querySelector<HTMLElement>('[data-menu-node-id]')?.dataset.menuNodeId
     return id ? Number(id) : null
   }
 
-  function handleDragStart({ item }: { item: HTMLElement }): void {
+  function handleDragStart({ item, from }: { item: HTMLElement; from: HTMLElement }): void {
     const id = rowNodeId(item)
     draggingNode.value = id === null ? null : (findMenuNode(tree.value, id) ?? null)
-    dragParentId.value = undefined
-    dragChanged = false
-    rootDropRequested = false
+    dragTableBody = from
   }
 
-  function handleDragUpdate(): void {
-    dragChanged = true
-  }
-
-  function resolveDropParent(target: HTMLElement): number | null | undefined {
-    const node = draggingNode.value
-    const targetId = rowNodeId(target)
-    const targetNode = targetId === null ? undefined : findMenuNode(tree.value, targetId)
-    if (!node || !targetNode || targetNode.type === 'button') return undefined
-    if (collectNodeAndDescendantIds(node).has(targetNode.id)) return undefined
-
-    return targetNode.type === 'directory' ? targetNode.id : targetNode.parent_id
-  }
-
-  function handleDragMove({ related }: { related: HTMLElement }): boolean {
-    dragParentId.value = resolveDropParent(related)
-    return dragParentId.value !== undefined
-  }
-
-  function handleRootDrop(): void {
-    if (!draggingNode.value) return
-    dragParentId.value = null
-    rootDropRequested = true
-  }
-
-  function resetDragState(): void {
-    draggingNode.value = null
-    dragParentId.value = undefined
-    dragChanged = false
-    rootDropRequested = false
-  }
-
-  async function handleDragEnd(): Promise<void> {
-    const node = draggingNode.value
-    const parentId = dragParentId.value
-    const shouldMove = dragChanged || rootDropRequested
-    resetDragState()
-
-    if (!node || parentId === undefined || !shouldMove || parentId === node.parent_id) {
-      await loadMenus()
-      return
+  function resolveDrop(
+    node: MenuNode,
+    tableBody: HTMLElement,
+    event?: MouseEvent | TouchEvent
+  ): MenuUpdateInput | undefined {
+    if (!event || event.type === 'dragend' || event.type.endsWith('cancel')) return
+    const point = 'changedTouches' in event ? event.changedTouches[0] : event
+    if (!point) return
+    const hit = document.elementFromPoint(point.clientX, point.clientY)
+    if (!hit) return
+    if (rootDropZone.value?.contains(hit)) {
+      return node.parent_id === null ? undefined : { parent_id: null }
     }
+
+    const row = hit.closest('tr')
+    if (!row || row.parentElement !== tableBody) return
+    const target = findMenuNode(tree.value, rowNodeId(row))
+    if (!target || target.type === 'button' || collectNodeAndDescendantIds(node).has(target.id))
+      return
+
+    const { top, height } = row.getBoundingClientRect()
+    const offset = (point.clientY - top) / height
+    if (target.type === 'directory' && offset >= 1 / 3 && offset <= 2 / 3) {
+      return node.parent_id === target.id ? undefined : { parent_id: target.id }
+    }
+
+    return { placement: { target_id: target.id, position: offset < 0.5 ? 'before' : 'after' } }
+  }
+
+  async function handleDragEnd({
+    from,
+    originalEvent
+  }: {
+    from: HTMLElement
+    originalEvent?: MouseEvent | TouchEvent
+  }): Promise<void> {
+    const node = draggingNode.value
+    const payload = node && resolveDrop(node, from, originalEvent)
+    draggingNode.value = null
+    dropTarget.value = undefined
+    dragTableBody = undefined
+    if (!node || !payload) return
 
     dragSaving.value = true
     try {
-      await fetchUpdateAdminMenu(node.id, { parent_id: parentId })
-      ElMessage.success('移动成功')
+      await fetchUpdateAdminMenu(node.id, payload)
+      ElMessage.success(payload.placement ? '排序已保存' : '移动成功')
       await afterMutation()
     } catch (error) {
       ElMessage.error(errorMessage(error))
@@ -496,3 +523,23 @@
 
   onMounted(loadMenus)
 </script>
+
+<style scoped>
+  .menu-page :deep(.menu-drag-source > td) {
+    background-color: var(--el-fill-color-light);
+    opacity: 0.55;
+  }
+
+  .menu-page :deep(.menu-drop-before > td) {
+    box-shadow: inset 0 3px var(--el-color-primary);
+  }
+
+  .menu-page :deep(.menu-drop-after > td) {
+    box-shadow: inset 0 -3px var(--el-color-primary);
+  }
+
+  .menu-page :deep(.menu-drop-inside > td),
+  .menu-root-drop-active {
+    background-color: var(--el-color-primary-light-8);
+  }
+</style>

@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AdminLog;
 use App\Models\AdminMenu;
 use App\Models\AdminPermission;
 use App\Models\AdminRole;
@@ -229,6 +230,48 @@ test('updates presentation and moves a page while preserving permissions grants 
     expect($button->fresh()->status)->toBeFalse();
     expect(AdminMenu::query()->where('parent_id', $menu->id)->count())->toBe(1);
     $this->assertDatabaseHas('admin_role_has_permissions', ['role_id' => $role->id, 'permission_id' => $permissionId]);
+});
+
+test('persists dragged sibling order in management and navigation when sorts are tied', function (string $position): void {
+    $this->seed(AdminMenuSeeder::class);
+    $admin = menuTestSuperAdmin();
+    $directory = menuTestNode(['name' => 'sortable', 'type' => 'directory']);
+    $first = menuTestNode(['name' => 'sortable.first', 'parent_id' => $directory->id, 'sort' => -4]);
+    $middle = menuTestNode(['name' => 'sortable.middle', 'parent_id' => $directory->id, 'sort' => -4]);
+    $last = menuTestNode(['name' => 'sortable.last', 'parent_id' => $directory->id, 'sort' => 6]);
+    $this->withToken($admin->createToken('reorder')->plainTextToken);
+
+    [$moved, $anchor, $expected] = $position === 'before'
+        ? [$last, $first, [$last->id, $first->id, $middle->id]]
+        : [$first, $last, [$middle->id, $last->id, $first->id]];
+
+    $this->patchJson('/api/v1/admin/menus/'.$moved->id, [
+        'placement' => ['target_id' => $anchor->id, 'position' => $position],
+    ])->assertOk()->assertJsonPath('data.parent_id', $directory->id);
+
+    foreach (['/api/v1/admin/menus', '/api/v1/admin/me/menus'] as $path) {
+        $response = $this->getJson($path)->assertOk();
+        $root = collect($response->json('data'))->firstWhere('id', $directory->id);
+        expect(array_column($root['children'], 'id'))->toBe($expected);
+    }
+    $audit = AdminLog::where('route_name', 'admin.menus.update')->sole();
+    expect($audit->target_id)->toBe($moved->id)
+        ->and(collect($audit->related_changes)->pluck('id')->contains($anchor->id))->toBeTrue();
+})->with(['before', 'after']);
+
+test('rejects relative placement into a descendant branch without changing any ranks', function (): void {
+    $this->seed(AdminMenuSeeder::class);
+    $admin = menuTestSuperAdmin();
+    $directory = menuTestNode(['name' => 'parent', 'type' => 'directory', 'sort' => 11]);
+    $child = menuTestNode(['name' => 'parent.child', 'parent_id' => $directory->id, 'sort' => 20]);
+
+    $this->withToken($admin->createToken('invalid-reorder')->plainTextToken)
+        ->patchJson('/api/v1/admin/menus/'.$directory->id, [
+            'placement' => ['target_id' => $child->id, 'position' => 'after'],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['parent_id']);
+
+    $this->assertDatabaseHas('admin_menus', ['id' => $directory->id, 'parent_id' => null, 'sort' => 11]);
+    $this->assertDatabaseHas('admin_menus', ['id' => $child->id, 'parent_id' => $directory->id, 'sort' => 20]);
 });
 
 test('rejects self descendant and invalid type moves with 422', function (string $move): void {

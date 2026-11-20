@@ -67,11 +67,44 @@ class AdminMenuService
             $nodes = AdminMenu::orderBy('id')->lockForUpdate()->get()->keyBy('id');
             $current = $nodes->get($menu->id);
             abort_unless($current, 404);
+            if (isset($data['placement'])) {
+                $target = $nodes->get($data['placement']['target_id']);
+                if (! $target || $target->is($current) || $target->type === 'button') {
+                    throw ValidationException::withMessages(['placement.target_id' => '请选择另一个目录或菜单作为排序目标。']);
+                }
+                $data['parent_id'] = $target->parent_id;
+            }
             $this->validateParent(array_replace($current->getAttributes(), $data), $current, $nodes);
-            $current->update($data);
+            if (isset($target)) {
+                $this->applyPlacement($current, $target, $data['placement']['position'], $nodes);
+                unset($data['placement']);
+            }
+            $current->fill($data)->save();
 
             return $current->refresh()->load('permission');
         });
+    }
+
+    /** @param Collection<int, AdminMenu> $nodes */
+    private function applyPlacement(AdminMenu $current, AdminMenu $target, string $position, Collection $nodes): void
+    {
+        $siblings = $nodes->filter(fn (AdminMenu $node): bool => $node->parent_id === $target->parent_id)
+            ->sortBy([['sort', 'asc'], ['id', 'asc']])->values();
+        $order = $siblings->reject(fn (AdminMenu $node): bool => $node->is($current))->values();
+        $targetIndex = $order->search(fn (AdminMenu $node): bool => $node->is($target));
+        $order->splice($targetIndex + ($position === 'after' ? 1 : 0), 0, [$current]);
+
+        if ($order->modelKeys() === $siblings->modelKeys()) {
+            return;
+        }
+
+        foreach ($order as $index => $node) {
+            if ($node->is($current)) {
+                $current->sort = $index;
+            } elseif ($node->sort !== $index) {
+                $node->update(['sort' => $index]);
+            }
+        }
     }
 
     /**

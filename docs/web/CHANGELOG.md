@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+- Show drop targets while dragging menu nodes and persist their order across reloads.
+- Disable the in-page Vue DevTools panel in development.
+- Add a searchable Remix Icon picker with manual Iconify entry to the menu editor.
+- Add placeholder guidance to the menu editor.
 - Remove the automatic setup hint from the top-bar settings button.
 - Connect administrator login, current user, logout, and permitted menus to Laravel using a single Bearer token.
 - Default development and production to backend permissions, with a Laravel development proxy and same-origin production API.

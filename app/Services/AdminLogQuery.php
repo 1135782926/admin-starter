@@ -7,6 +7,7 @@ use App\Models\AdminUser;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class AdminLogQuery
 {
@@ -22,6 +23,7 @@ class AdminLogQuery
             'ip_address', 'user_agent', 'duration_ms', 'created_at',
         ])->orderByDesc('created_at');
 
+        
         return BaseListService::paginateQuery(
             $query,
             $filters,
