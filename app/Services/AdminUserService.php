@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
+use Spatie\QueryBuilder\AllowedFilter;
 
 class AdminUserService
 {
@@ -28,21 +29,12 @@ class AdminUserService
     /** @param array<string, mixed> $filters */
     public function paginate(AdminUser $actor, array $filters): LengthAwarePaginator
     {
-        $query = $this->scope->adminQuery($actor)->with('roles')->orderByDesc('id');
-        $keyword = trim($filters['keyword'] ?? '');
-        if ($keyword !== '') {
-            $query->where(function (Builder $query) use ($keyword): void {
-                $query->where('username', 'like', '%'.$keyword.'%')
-                    ->orWhere('nickname', 'like', '%'.$keyword.'%')
-                    ->orWhere('email', 'like', '%'.$keyword.'%')
-                    ->orWhere('mobile', 'like', '%'.$keyword.'%');
-            });
-        }
-        if (array_key_exists('status', $filters)) {
-            $query->where('status', $filters['status']);
-        }
-
-        return $query->paginate($filters['per_page'] ?? 20, ['*'], 'page', $filters['page'] ?? 1);
+        return BaseListService::paginateQuery(
+            $this->scope->adminQuery($actor)->with('roles'),
+            $filters,
+            TableFilters::keyword('username', 'nickname', 'email', 'mobile'),
+            AllowedFilter::exact('status'),
+        );
     }
 
     public function find(AdminUser $actor, AdminUser $admin): AdminUser

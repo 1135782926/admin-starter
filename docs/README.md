@@ -95,7 +95,7 @@ Allowed formats are JPEG/PNG/WebP/GIF, PDF, DOC/DOCX, XLS/XLSX, TXT, and ZIP. Bo
 
 Run `php artisan test --compact tests/Feature/AttachmentManagementTest.php tests/Feature/AdminLogTest.php` to verify upload, storage, permissions, filtering, signed URLs, direct deletion, editor upload, auditing, throttling, and failure cleanup.
 
-Standard model-backed lists such as members and attachments extend `App\Services\BaseListService`. Supply `listQuery()` with the model query and any required relations, constraints, or primary sort. The inherited `paginate()` defaults to page 1 and 20 rows and appends the primary key in descending order for stable pagination. Override `allowedFilters()` to declare filters using `AllowedFilter::exact()`, `TableFilters::keyword()`, or `TableFilters::dateRange()`. Keep the matching rules in the request. All filters use validated flat parameters. Audit logs apply the same filter helpers to a query built for the current administrator.
+Standard model-backed lists such as members and attachments extend `App\Services\BaseListService`. Define `listQuery()` for model relations or primary sorting and `allowedFilters()` for the filter whitelist. Lists scoped to the signed-in administrator can call `BaseListService::paginateQuery()` with their scoped builder and filter definitions. Both entry points use validated flat parameters, default to page 1 with 20 rows, and append the primary key in descending order for stable pagination.
 
 ## Member management
 

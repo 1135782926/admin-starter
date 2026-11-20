@@ -16,8 +16,19 @@ abstract class BaseListService
      */
     final public function paginate(array $filters = []): LengthAwarePaginator
     {
-        $query = $this->listQuery();
-        TableFilters::apply($query, $filters, ...$this->allowedFilters());
+        return self::paginateQuery($this->listQuery(), $filters, ...$this->allowedFilters());
+    }
+
+    /**
+     * @template T of Model
+     *
+     * @param  Builder<T>  $query
+     * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, T>
+     */
+    public static function paginateQuery(Builder $query, array $filters, AllowedFilter ...$allowedFilters): LengthAwarePaginator
+    {
+        TableFilters::apply($query, $filters, ...$allowedFilters);
 
         return $query->orderByDesc($query->getModel()->getQualifiedKeyName())
             ->paginate($filters['per_page'] ?? 20, ['*'], 'page', $filters['page'] ?? 1);

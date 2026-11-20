@@ -20,9 +20,9 @@ class AdminLogQuery
             'module', 'action', 'permission_name', 'route_name', 'method', 'path',
             'target_type', 'target_id', 'target_label', 'status_code', 'success',
             'ip_address', 'user_agent', 'duration_ms', 'created_at',
-        ])->orderByDesc('created_at')->orderByDesc('id');
+        ])->orderByDesc('created_at');
 
-        TableFilters::apply(
+        return BaseListService::paginateQuery(
             $query,
             $filters,
             TableFilters::keyword('actor_username', 'actor_nickname', 'attempted_username', 'target_label'),
@@ -34,8 +34,6 @@ class AdminLogQuery
             AllowedFilter::exact('ip_address'),
             ...TableFilters::dateRange(),
         );
-
-        return $query->paginate($filters['per_page'] ?? 20, ['*'], 'page', $filters['page'] ?? 1);
     }
 
     public function paginatePersonal(AdminUser $actor, int $page): LengthAwarePaginator
