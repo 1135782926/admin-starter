@@ -15,16 +15,15 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->call(SystemMenuSeeder::class);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        if (app()->environment(['local', 'testing'])) {
+            User::query()->firstOrCreate(
+                ['email' => 'test@example.com'],
+                fn (): array => User::factory()->raw(['name' => 'Test User', 'email' => 'test@example.com']),
+            );
 
-        $this->call(AdminManagementMenuSeeder::class);
-        $this->call(AttachmentManagementMenuSeeder::class);
-        $this->call(MemberManagementMenuSeeder::class);
-        $this->call(AdminUserSeeder::class);
+            $this->call(AdminUserSeeder::class);
+        }
     }
 }

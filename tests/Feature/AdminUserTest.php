@@ -5,7 +5,6 @@ use App\Models\AdminPermission;
 use App\Models\AdminRole;
 use App\Models\AdminUser;
 use App\Models\User;
-use Database\Seeders\AdminUserSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -78,8 +77,9 @@ test('default database seeding provides admin login and preserves a changed pass
         ->assertJsonStructure(['data' => ['token']]);
 
     $admin->update(['password' => 'changed-admin-password']);
-    $this->seed(AdminUserSeeder::class);
+    $this->seed();
 
     expect(AdminUser::query()->where('username', 'admin')->count())->toBe(1)
+        ->and(User::query()->where('email', 'test@example.com')->count())->toBe(1)
         ->and(Hash::check('changed-admin-password', $admin->fresh()->password))->toBeTrue();
 });

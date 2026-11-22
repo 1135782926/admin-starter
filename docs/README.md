@@ -31,13 +31,25 @@ Run `php artisan migrate` to create the permission tables. Use `php artisan perm
 
 Administrator records use `App\Models\AdminUser` and the `admin_users` table. Usernames are unique; nickname and password are required. Avatar, email, mobile, and signature are optional. Status is a boolean (`1` enabled, `0` disabled) and defaults to enabled.
 
-Roles use the existing Spatie relationships and the `web` permission guard. Passwords are hashed automatically and excluded from serialized responses. `AdminUserSeeder` provisions the enabled `admin` account with initial password `admin` and the `super-admin` role; repeated runs do not reset a changed password. Migrations do not create administrator accounts. This public weak credential is for local initialization only and must be changed immediately in deployed environments.
+Roles use the existing Spatie relationships and the `web` permission guard. Passwords are hashed and excluded from serialized responses. `AdminUserSeeder` creates the `admin / admin` demo super administrator in `local` and `testing` environments only. It preserves existing accounts and their roles.
+
+### Production installation and administrator recovery
+
+Run these commands on the application host after checking the target database connection. Replace `site-owner` with the intended administrator login name.
+
+```sh
+php artisan migrate --force --no-interaction
+php artisan db:seed --class=SystemMenuSeeder --force --no-interaction
+php artisan admin:bootstrap site-owner
+```
+
+`SystemMenuSeeder` initializes all built-in menus, including attachments and members. It can also be run after migrations on an existing installation. `admin:bootstrap` creates an enabled super administrator if none is enabled and the username is unused. It prompts twice for a hidden password of at least 12 characters. For an existing enabled administrator, run `php artisan admin:bootstrap site-owner --reset-password` to set a new password and revoke that account’s existing tokens. After the reset, sign in again with the new password.
 
 ### Administrator API and menu setup
 
 The administrator API uses `/api/v1/admin`: `POST /auth/login` accepts `userName` and `password`, `GET /me` returns the current profile and effective button permissions, and `POST /auth/logout` revokes only the current token. Send `Authorization: Bearer <token>` on protected requests. Tokens expire after seven days; configure `ADMIN_TOKEN_DAYS` on the backend to change this. There is no refresh token. Sessions and ordinary `User` tokens cannot authenticate administrator requests. Disabling an administrator through the `AdminUser` model revokes their tokens.
 
-After reviewing the database connection, run `php artisan migrate --no-interaction` and `php artisan db:seed --no-interaction` on a fresh installation to initialize the management menus and the default `admin / admin` super administrator. To initialize only `system.menu` and its access/view/create/update/delete permissions, run `php artisan db:seed --class=AdminMenuSeeder --no-interaction`; this menu seeder is repeatable and creates no accounts or role assignments. Ordinary roles require both page access and the relevant operation permission.
+For manual local setup, run `php artisan migrate --no-interaction` and `php artisan db:seed --no-interaction` with `APP_ENV=local` to initialize the built-in menus and demo super administrator. To initialize only `system.menu` and its access/view/create/update/delete permissions, run `php artisan db:seed --class=AdminMenuSeeder --no-interaction`. Ordinary roles require both page access and the relevant operation permission.
 
 Menu endpoints are `GET/POST /menus`, `GET/PATCH/DELETE /menus/{id}`, `GET /menus/permission-tree`, `GET /menus/{id}/deletion-impact`, and `GET /me/menus`. Deletion requires a JSON body containing `{"confirmed":true}` and rejects nodes with children. Page creation defaults to four basic buttons; send `"buttons":[]` for none, or select from `view/create/update/delete`. Node names and types are immutable. Custom button names must use the parent menu's prefix, for example `goods.export`.
 

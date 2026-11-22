@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\AdminRole;
 use App\Models\AdminUser;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class AdminUserSeeder extends Seeder
 {
@@ -13,14 +14,19 @@ class AdminUserSeeder extends Seeder
      */
     public function run(): void
     {
-        $admin = AdminUser::firstOrCreate(
-            ['username' => 'admin'],
-            ['nickname' => '超级管理员', 'password' => 'admin', 'status' => true],
-        );
-        $superAdmin = AdminRole::findOrCreate('super-admin', 'web');
-
-        if (! $admin->hasRole($superAdmin)) {
-            $admin->assignRole($superAdmin);
+        if (! app()->environment(['local', 'testing'])) {
+            return;
         }
+
+        DB::transaction(function (): void {
+            $admin = AdminUser::firstOrCreate(
+                ['username' => 'admin'],
+                ['nickname' => '超级管理员', 'password' => 'admin', 'status' => true],
+            );
+
+            if ($admin->wasRecentlyCreated) {
+                $admin->assignRole(AdminRole::findOrCreate('super-admin', 'web'));
+            }
+        });
     }
 }

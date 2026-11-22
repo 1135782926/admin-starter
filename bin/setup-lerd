@@ -97,9 +97,8 @@ if ! awk -v main="$main_host" -v api="$api_host" '
     printf '当前 Laravel 站点未取得 %s 和 %s，请检查域名冲突。\n' "$main_host" "$api_host" >&2
     exit 1
 fi
-for seeder in AdminManagementMenuSeeder AttachmentManagementMenuSeeder AdminUserSeeder; do
-    lerd php artisan db:seed --class="$seeder" --no-interaction
-done
+lerd php artisan db:seed --class=SystemMenuSeeder --no-interaction
+lerd php artisan db:seed --class=AdminUserSeeder --no-interaction
 
 (
     cd web
